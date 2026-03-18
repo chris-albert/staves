@@ -6,7 +6,7 @@ export const rootRoute = createRootRoute({
 
 function RootLayout() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <Outlet />
     </div>
   );
