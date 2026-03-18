@@ -1,6 +1,5 @@
 import type { Track } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
-import { VolumeFader } from './VolumeFader';
 import { LevelMeter } from './LevelMeter';
 import { InputSelect } from './InputSelect';
 import { Knob } from '@staves/ui';
@@ -70,20 +69,24 @@ export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderP
           <TrackButton active={track.isSolo} color="blue" onClick={toggleSolo}>S</TrackButton>
           <TrackButton active={track.isArmed} color="red" onClick={toggleArm}>R</TrackButton>
 
-          <div className="ml-1">
+          <div className="ml-1.5 flex items-center gap-2">
+            <Knob
+              value={track.volume}
+              min={0}
+              max={1}
+              onChange={(v) => updateTrack(track.id, { volume: v })}
+              size={18}
+              label="Vol"
+            />
             <Knob
               value={track.pan}
               min={-1}
               max={1}
               onChange={(v) => updateTrack(track.id, { pan: v })}
               size={18}
+              label="Pan"
             />
           </div>
-
-          <VolumeFader
-            value={track.volume}
-            onChange={(v) => updateTrack(track.id, { volume: v })}
-          />
 
           {track.isArmed && <LevelMeter level={recordingLevel} />}
         </div>
