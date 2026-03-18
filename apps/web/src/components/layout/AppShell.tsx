@@ -29,7 +29,7 @@ export function AppShell({ toolbar, trackList, timeline, connectionStatus, peerC
         {/* Track list sidebar */}
         <div
           ref={trackListRef}
-          className="w-60 flex-shrink-0 border-r border-zinc-800/80 bg-zinc-950 overflow-y-auto"
+          className="w-60 flex-shrink-0 border-r border-zinc-800/80 bg-zinc-950 overflow-y-auto scrollbar-hidden"
           onScroll={handleTrackListScroll}
         >
           {/* Spacer aligned to timeline ruler */}

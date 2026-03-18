@@ -37,7 +37,7 @@ export function Knob({ value, min, max, onChange, size = 32, label }: KnobProps)
   );
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center">
       <svg
         width={size}
         height={size}
@@ -58,7 +58,7 @@ export function Knob({ value, min, max, onChange, size = 32, label }: KnobProps)
           transform={`rotate(${angle} 16 16)`}
         />
       </svg>
-      {label && <span className="text-xs text-zinc-400">{label}</span>}
+      {label && <span className="text-[9px] leading-none text-zinc-500">{label}</span>}
     </div>
   );
 }
