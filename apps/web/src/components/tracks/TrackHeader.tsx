@@ -3,8 +3,15 @@ import { useProjectStore } from '@/stores/projectStore';
 import { LevelMeter } from './LevelMeter';
 import { InputSelect } from './InputSelect';
 import { Knob } from '@staves/ui';
-import { useCallback } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { AudioDevice } from '@/hooks/useAudioDevices';
+
+const TRACK_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e',
+  '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899',
+  '#f43f5e', '#14b8a6', '#a855f7', '#6366f1',
+];
 
 interface TrackHeaderProps {
   track: Track;
@@ -15,6 +22,51 @@ interface TrackHeaderProps {
 export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderProps) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
   const removeTrack = useProjectStore((s) => s.removeTrack);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(track.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const colorRef = useRef<HTMLButtonElement>(null);
+  const colorMenuRef = useRef<HTMLDivElement>(null);
+  const [colorPos, setColorPos] = useState({ top: 0, left: 0 });
+
+  // Focus name input when editing
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.select();
+  }, [editingName]);
+
+  // Close color picker on outside click
+  useEffect(() => {
+    if (!showColorPicker) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        colorRef.current?.contains(e.target as Node) ||
+        colorMenuRef.current?.contains(e.target as Node)
+      ) return;
+      setShowColorPicker(false);
+    }
+    document.addEventListener('pointerdown', handleClick);
+    return () => document.removeEventListener('pointerdown', handleClick);
+  }, [showColorPicker]);
+
+  const commitName = useCallback(() => {
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== track.name) {
+      updateTrack(track.id, { name: trimmed });
+    } else {
+      setNameValue(track.name);
+    }
+    setEditingName(false);
+  }, [nameValue, track.id, track.name, updateTrack]);
+
+  const openColorPicker = useCallback(() => {
+    if (!colorRef.current) return;
+    const rect = colorRef.current.getBoundingClientRect();
+    setColorPos({ top: rect.bottom + 4, left: rect.left });
+    setShowColorPicker(true);
+  }, []);
 
   const toggleMute = useCallback(
     () => updateTrack(track.id, { isMuted: !track.isMuted }),
@@ -40,13 +92,68 @@ export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderP
       className="group flex items-stretch border-b border-zinc-800/80 transition-colors hover:bg-zinc-900/50"
       style={{ minHeight: 80 }}
     >
-      {/* Color bar */}
-      <div className="w-1 flex-shrink-0" style={{ backgroundColor: track.color }} />
+      {/* Color bar — click to change color */}
+      <button
+        ref={colorRef}
+        onClick={openColorPicker}
+        className="w-1.5 flex-shrink-0 cursor-pointer hover:w-2 transition-all"
+        style={{ backgroundColor: track.color }}
+        title="Change track color"
+      />
+
+      {showColorPicker && createPortal(
+        <div
+          ref={colorMenuRef}
+          className="fixed z-[100] grid grid-cols-4 gap-1 rounded-lg border border-zinc-700 bg-zinc-800 p-2 shadow-xl"
+          style={{ top: colorPos.top, left: colorPos.left }}
+        >
+          {TRACK_COLORS.map((c) => (
+            <button
+              key={c}
+              onClick={() => {
+                updateTrack(track.id, { color: c });
+                setShowColorPicker(false);
+              }}
+              className={`h-5 w-5 rounded-full transition-transform hover:scale-125 ${
+                c === track.color ? 'ring-2 ring-white ring-offset-1 ring-offset-zinc-800' : ''
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>,
+        document.body,
+      )}
 
       <div className="flex flex-1 flex-col gap-1.5 px-3 py-2">
         {/* Row 1: name + input select + delete */}
         <div className="flex items-center gap-1.5">
-          <span className="flex-1 truncate text-[13px] font-medium text-zinc-200">{track.name}</span>
+          {editingName ? (
+            <input
+              ref={nameInputRef}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitName();
+                if (e.key === 'Escape') {
+                  setNameValue(track.name);
+                  setEditingName(false);
+                }
+              }}
+              className="flex-1 min-w-0 rounded bg-zinc-800 px-1 py-0.5 text-[13px] font-medium text-zinc-100 outline-none ring-1 ring-zinc-600 focus:ring-zinc-400"
+            />
+          ) : (
+            <span
+              className="flex-1 truncate text-[13px] font-medium text-zinc-200 cursor-text rounded px-1 py-0.5 -mx-1 hover:bg-zinc-800/60 transition-colors"
+              onDoubleClick={() => {
+                setNameValue(track.name);
+                setEditingName(true);
+              }}
+              title="Double-click to rename"
+            >
+              {track.name}
+            </span>
+          )}
           <InputSelect
             devices={audioInputs}
             value={track.inputDeviceId}
