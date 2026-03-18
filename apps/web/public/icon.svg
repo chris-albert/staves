@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#18181b"/>
+  <!-- Five staff lines with gentle wave -->
+  <path d="M64 128 Q160 96, 256 128 T448 128" stroke="#71717a" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 192 Q160 160, 256 192 T448 192" stroke="#71717a" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 256 Q160 224, 256 256 T448 256" stroke="#a1a1aa" stroke-width="7" stroke-linecap="round"/>
+  <path d="M64 320 Q160 288, 256 320 T448 320" stroke="#71717a" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 384 Q160 352, 256 384 T448 384" stroke="#71717a" stroke-width="6" stroke-linecap="round"/>
+  <!-- Quarter note on the second line -->
+  <ellipse cx="320" cy="192" rx="28" ry="20" transform="rotate(-15 320 192)" fill="#e4e4e7"/>
+  <line x1="345" y1="188" x2="345" y2="96" stroke="#e4e4e7" stroke-width="8" stroke-linecap="round"/>
+  <!-- Eighth note on the fourth line -->
+  <ellipse cx="192" cy="320" rx="24" ry="17" transform="rotate(-15 192 320)" fill="#a1a1aa"/>
+  <line x1="213" y1="316" x2="213" y2="232" stroke="#a1a1aa" stroke-width="7" stroke-linecap="round"/>
+  <path d="M213 232 Q230 240, 228 260" stroke="#a1a1aa" stroke-width="6" stroke-linecap="round" fill="none"/>
+</svg>
