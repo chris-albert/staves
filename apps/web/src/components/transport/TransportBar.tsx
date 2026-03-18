@@ -66,13 +66,13 @@ export function TransportBar({ isRecording, hasArmedTrack, onRecord, onStopRecor
       <div className="mx-1 h-5 w-px bg-zinc-800" />
       <BpmControl bpm={bpm} onChange={setBpm} />
 
-      {/* Recording indicator */}
-      {isRecording && (
-        <div className="ml-2 flex items-center gap-1.5 rounded-full bg-red-950/60 px-2.5 py-1">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-          <span className="text-[10px] font-semibold tracking-wider text-red-400">REC</span>
-        </div>
-      )}
+      {/* Recording indicator — always rendered to prevent layout shift */}
+      <div className={`ml-2 flex items-center gap-1.5 rounded-full px-2.5 py-1 transition-opacity ${
+        isRecording ? 'bg-red-950/60 opacity-100' : 'opacity-0 pointer-events-none'
+      }`}>
+        <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+        <span className="text-[10px] font-semibold tracking-wider text-red-400">REC</span>
+      </div>
     </div>
   );
 }

@@ -20,7 +20,7 @@ export function Toolbar({
   onNavigateHome,
 }: ToolbarProps) {
   return (
-    <div className="relative z-20 flex h-11 items-center border-b border-zinc-800 bg-zinc-900 px-3 gap-3">
+    <div className="relative z-20 flex h-11 items-center border-b border-zinc-800 bg-zinc-900 px-3 gap-3 overflow-hidden">
       {/* Left: back + project name */}
       <div className="flex items-center gap-2 min-w-0 w-56 flex-shrink-0">
         <button
