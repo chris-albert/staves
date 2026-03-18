@@ -89,8 +89,7 @@ export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderP
 
   return (
     <div
-      className="group flex items-stretch border-b border-zinc-800/80 transition-colors hover:bg-zinc-900/50"
-      style={{ minHeight: 80 }}
+      className="group flex h-20 items-stretch border-b border-zinc-800/80 transition-colors hover:bg-zinc-900/50"
     >
       {/* Color bar — click to change color */}
       <button
@@ -195,7 +194,7 @@ export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderP
             />
           </div>
 
-          {track.isArmed && <LevelMeter level={recordingLevel} />}
+          <LevelMeter level={track.isArmed ? recordingLevel : 0} visible={track.isArmed} />
         </div>
       </div>
     </div>
