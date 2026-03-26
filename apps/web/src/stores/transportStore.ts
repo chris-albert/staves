@@ -3,6 +3,9 @@ import { create } from 'zustand';
 interface TransportState {
   isPlaying: boolean;
   isRecording: boolean;
+  recordingStartBeat: number;
+  recordingTrackId: string | null;
+  playOrigin: number;
   currentBeat: number;
   bpm: number;
   loopEnabled: boolean;
@@ -14,6 +17,8 @@ interface TransportState {
 interface TransportActions {
   setPlaying: (playing: boolean) => void;
   setRecording: (recording: boolean) => void;
+  setRecordingInfo: (startBeat: number, trackId: string) => void;
+  setPlayOrigin: (beat: number) => void;
   setCurrentBeat: (beat: number) => void;
   setBpm: (bpm: number) => void;
   setLoopEnabled: (enabled: boolean) => void;
@@ -25,6 +30,9 @@ interface TransportActions {
 const initialState: TransportState = {
   isPlaying: false,
   isRecording: false,
+  recordingStartBeat: 0,
+  recordingTrackId: null,
+  playOrigin: 0,
   currentBeat: 0,
   bpm: 120,
   loopEnabled: false,
@@ -37,7 +45,9 @@ export const useTransportStore = create<TransportState & TransportActions>()((se
   ...initialState,
 
   setPlaying: (isPlaying) => set({ isPlaying }),
-  setRecording: (isRecording) => set({ isRecording }),
+  setRecording: (isRecording) => set(isRecording ? { isRecording } : { isRecording, recordingStartBeat: 0, recordingTrackId: null }),
+  setRecordingInfo: (recordingStartBeat, recordingTrackId) => set({ recordingStartBeat, recordingTrackId }),
+  setPlayOrigin: (playOrigin) => set({ playOrigin }),
   setCurrentBeat: (currentBeat) => set({ currentBeat }),
   setBpm: (bpm) => set({ bpm }),
   setLoopEnabled: (loopEnabled) => set({ loopEnabled }),

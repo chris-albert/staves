@@ -22,6 +22,7 @@ export function useRecorder() {
     engine.transport.record();
 
     recorderRef.current = recorder;
+    useTransportStore.getState().setRecordingInfo(startBeatRef.current, trackId);
     useTransportStore.getState().setRecording(true);
     useTransportStore.getState().setPlaying(true);
 
@@ -30,13 +31,18 @@ export function useRecorder() {
 
   const stopRecording = useCallback(async () => {
     const recorder = recorderRef.current;
-    if (!recorder) return;
+    if (!recorder) {
+      console.warn('[staves] stopRecording: no recorder ref');
+      return;
+    }
 
     // Capture the current beat BEFORE stopping transport (stop resets to 0)
     const engine = AudioEngine.getInstance();
     const endBeat = engine.transport.currentBeat;
+    console.log('[staves] stopRecording: endBeat', endBeat);
 
     const { blob, format } = await recorder.stop();
+    console.log('[staves] stopRecording: blob size', blob.size, 'format', format);
     recorder.dispose();
     recorderRef.current = null;
 
@@ -47,20 +53,24 @@ export function useRecorder() {
 
     // Store the audio blob
     const projectId = useProjectStore.getState().project?.id;
-    if (!projectId) return;
-
-    // Decode to get actual sample rate and duration
-    const tempContext = new AudioContext();
-    const arrayBuffer = await blob.arrayBuffer();
-    let audioBuffer: AudioBuffer;
-    try {
-      audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
-    } catch (e) {
-      console.error('Failed to decode recorded audio:', e);
-      await tempContext.close();
+    if (!projectId) {
+      console.warn('[staves] stopRecording: no projectId');
       return;
     }
-    await tempContext.close();
+
+    // Decode to get actual sample rate and duration
+    const arrayBuffer = await blob.arrayBuffer();
+    console.log('[staves] stopRecording: arrayBuffer bytes', arrayBuffer.byteLength);
+    // Use a copy for decoding since decodeAudioData detaches the buffer
+    const decodeCopy = arrayBuffer.slice(0);
+    let audioBuffer: AudioBuffer;
+    try {
+      audioBuffer = await engine.context.decodeAudioData(decodeCopy);
+    } catch (e) {
+      console.error('[staves] stopRecording: decode failed', e);
+      return;
+    }
+    console.log('[staves] stopRecording: decoded', audioBuffer.duration, 's', audioBuffer.sampleRate, 'Hz');
 
     const stored = await audioBlobStore.store(
       projectId,
@@ -84,6 +94,10 @@ export function useRecorder() {
       audioBlobId: stored.id,
       startBeat: startBeatRef.current,
       durationBeats: Math.max(0.25, durationBeats),
+      blob,
+      format,
+      sampleRate: audioBuffer.sampleRate,
+      durationSeconds: audioBuffer.duration,
     };
   }, []);
 

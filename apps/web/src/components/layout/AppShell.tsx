@@ -5,6 +5,7 @@ import type { ConnectionStatus } from '@/hooks/useSync';
 interface AppShellProps {
   toolbar: ReactNode;
   trackList: ReactNode;
+  masterTrack: ReactNode;
   timeline: ReactNode;
   connectionStatus: ConnectionStatus;
   peerCount: number;
@@ -12,7 +13,7 @@ interface AppShellProps {
   onShareRoom: () => void;
 }
 
-export function AppShell({ toolbar, trackList, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
+export function AppShell({ toolbar, trackList, masterTrack, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
   const trackListRef = useRef<HTMLDivElement>(null);
   const [, setScrollTop] = useState(0);
 
@@ -23,18 +24,22 @@ export function AppShell({ toolbar, trackList, timeline, connectionStatus, peerC
   }, []);
 
   return (
-    <div className="flex h-screen min-w-[1024px] flex-col bg-zinc-950">
+    <div className="flex h-screen min-w-[1024px] flex-col overflow-hidden bg-zinc-950">
       {toolbar}
       <div className="flex flex-1 overflow-hidden">
         {/* Track list sidebar */}
-        <div
-          ref={trackListRef}
-          className="w-60 flex-shrink-0 border-r border-zinc-800/80 bg-zinc-950 overflow-y-auto scrollbar-hidden"
-          onScroll={handleTrackListScroll}
-        >
-          {/* Spacer aligned to timeline ruler */}
-          <div className="h-6 border-b border-zinc-800/80 bg-zinc-900/40" />
-          {trackList}
+        <div className="w-60 flex-shrink-0 flex flex-col overflow-hidden border-r border-zinc-800/80 bg-zinc-950">
+          <div
+            ref={trackListRef}
+            className="flex-1 overflow-y-auto scrollbar-hidden"
+            onScroll={handleTrackListScroll}
+          >
+            {/* Spacer aligned to timeline ruler */}
+            <div className="h-6 border-b border-zinc-800/80 bg-zinc-900/40" />
+            {trackList}
+          </div>
+          {/* Master track pinned at bottom */}
+          {masterTrack}
         </div>
         {/* Timeline area */}
         <div className="flex-1 overflow-hidden bg-zinc-950">

@@ -14,9 +14,11 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAudioDevices } from '@/hooks/useAudioDevices';
+import { useTrackLevels } from '@/hooks/useTrackLevels';
 import { AppShell } from '@/components/layout/AppShell';
 import { Toolbar } from '@/components/layout/Toolbar';
 import { TrackList } from '@/components/tracks/TrackList';
+import { MasterTrack } from '@/components/tracks/MasterTrack';
 import { Timeline } from '@/components/timeline/Timeline';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
 import { rootRoute } from './__root';
@@ -51,7 +53,7 @@ function DawEditorPage() {
 
   // Sync / collaboration
   const [roomId, setRoomId] = useState<string | null>(null);
-  const { status: connectionStatus, peerCount, getProvider } = useSync(roomId);
+  const { status: connectionStatus, peerCount, getProvider, getBlobTransfer } = useSync(roomId);
 
   // Audio devices
   const {
@@ -65,7 +67,8 @@ function DawEditorPage() {
   useAudioEngine();
   usePlayheadPosition();
   useAutoSave();
-  useEngineSync();
+  const { trackNodesRef } = useEngineSync();
+  const trackLevels = useTrackLevels(trackNodesRef);
   const { undo, redo } = useUndoRedo(getProvider);
   const { startRecording, stopRecording, level: recordingLevel } = useRecorder();
   const isRecording = useTransportStore((s) => s.isRecording);
@@ -108,7 +111,6 @@ function DawEditorPage() {
   const handleRecord = useCallback(async () => {
     const armedTrack = tracks.find((t) => t.isArmed);
     if (!armedTrack) return;
-    // Use the track's own input device, falling back to global selection
     const deviceId = armedTrack.inputDeviceId || selectedInputId || undefined;
     await startRecording(armedTrack.id, deviceId);
   }, [tracks, startRecording, selectedInputId]);
@@ -131,7 +133,21 @@ function DawEditorPage() {
       gainDb: 0,
     });
     addClip(clip);
-  }, [stopRecording, tracks, project, clips.length, addClip]);
+
+    // Send the recorded audio blob to connected peers
+    const blobTransfer = getBlobTransfer();
+    if (blobTransfer) {
+      const arrayBuffer = await result.blob.arrayBuffer();
+      blobTransfer.sendBlob(
+        result.audioBlobId,
+        arrayBuffer,
+        result.format,
+        result.sampleRate,
+        result.durationSeconds,
+        project.id,
+      );
+    }
+  }, [stopRecording, tracks, project, clips.length, addClip, getBlobTransfer]);
 
   // --- Track management ---
   const handleAddTrack = useCallback(async () => {
@@ -213,7 +229,8 @@ function DawEditorPage() {
             onNavigateHome={() => navigate({ to: '/' })}
           />
         }
-        trackList={<TrackList onAddTrack={handleAddTrack} recordingLevel={recordingLevel} audioInputs={inputs} />}
+        trackList={<TrackList onAddTrack={handleAddTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
+        masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         timeline={<Timeline />}
         connectionStatus={connectionStatus}
         peerCount={peerCount}
@@ -252,6 +269,7 @@ function useTransportHooks() {
     const engine = AudioEngine.getInstance();
     engine.init().then(() => {
       engine.transport.play();
+      useTransportStore.getState().setPlayOrigin(engine.transport.playOrigin);
       useTransportStore.getState().setPlaying(true);
     });
   }, []);
@@ -259,6 +277,8 @@ function useTransportHooks() {
   const stop = useCallback(() => {
     const engine = AudioEngine.getInstance();
     engine.transport.stop();
+    // Sync the beat back to play origin
+    useTransportStore.getState().setCurrentBeat(engine.transport.currentBeat);
     useTransportStore.getState().setPlaying(false);
     useTransportStore.getState().setRecording(false);
   }, []);

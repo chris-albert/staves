@@ -23,6 +23,7 @@ export interface Track {
   isArmed: boolean;
   color: string;
   inputDeviceId: string; // '' = system default
+  inputChannel: number; // -1 = all channels (stereo), 0 = ch 1, 1 = ch 2, etc.
 }
 
 export interface Clip {
@@ -79,6 +80,20 @@ db.version(2).stores({
   return tx.table('tracks').toCollection().modify((track) => {
     if (track.inputDeviceId === undefined) {
       track.inputDeviceId = '';
+    }
+  });
+});
+
+db.version(3).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+}).upgrade((tx) => {
+  return tx.table('tracks').toCollection().modify((track) => {
+    if (track.inputChannel === undefined) {
+      track.inputChannel = -1;
     }
   });
 });

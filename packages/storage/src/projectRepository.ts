@@ -71,6 +71,7 @@ export const projectRepository = {
       isArmed: false,
       color: TRACK_COLORS[existing % TRACK_COLORS.length]!,
       inputDeviceId: '',
+      inputChannel: -1,
     };
     await db.tracks.add(track);
     await db.projects.update(projectId, { updatedAt: Date.now() });

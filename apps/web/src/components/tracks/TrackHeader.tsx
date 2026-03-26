@@ -15,11 +15,11 @@ const TRACK_COLORS = [
 
 interface TrackHeaderProps {
   track: Track;
-  recordingLevel: number;
+  stereoLevel: [number, number];
   audioInputs: AudioDevice[];
 }
 
-export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderProps) {
+export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProps) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
   const removeTrack = useProjectStore((s) => s.removeTrack);
 
@@ -194,9 +194,11 @@ export function TrackHeader({ track, recordingLevel, audioInputs }: TrackHeaderP
             />
           </div>
 
-          <LevelMeter level={track.isArmed ? recordingLevel : 0} visible={track.isArmed} />
         </div>
       </div>
+
+      {/* Level meter — right edge */}
+      <LevelMeter levelL={stereoLevel[0]} levelR={stereoLevel[1]} />
     </div>
   );
 }

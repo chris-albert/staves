@@ -171,4 +171,6 @@ export function useEngineSync() {
       trackNodes.clear();
     };
   }, []);
+
+  return { trackNodesRef };
 }
