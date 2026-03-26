@@ -14,11 +14,14 @@ interface TransportBarProps {
 export function TransportBar({ isRecording, hasArmedTrack, onRecord, onStopRecord }: TransportBarProps) {
   const { isPlaying, play, stop, bpm, setBpm, loopEnabled, toggleLoop, metronomeEnabled, toggleMetronome } = useTransport();
 
+  // When recording, stop button should stop recording (which also stops transport)
+  const handleStop = isRecording ? onStopRecord : stop;
+
   return (
     <div className="flex items-center gap-1">
       {/* Transport controls group */}
       <div className="flex items-center rounded-lg bg-zinc-800/60 p-0.5 gap-0.5">
-        <PlayButton isPlaying={isPlaying} onPlay={play} onStop={stop} />
+        <PlayButton isPlaying={isPlaying} onPlay={play} onStop={handleStop} />
         <RecordButton
           isRecording={isRecording}
           hasArmedTrack={hasArmedTrack}

@@ -25,6 +25,7 @@ export function useTransport() {
     const engine = AudioEngine.getInstance();
     engine.transport.seek(beat);
     useTransportStore.getState().setCurrentBeat(beat);
+    useTransportStore.getState().setPlayOrigin(beat);
   }, []);
 
   const setBpm = useCallback((newBpm: number) => {

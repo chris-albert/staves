@@ -35,6 +35,7 @@ export class Transport {
   private state: TransportState = 'stopped';
   private startContextTime = 0;
   private startBeatOffset = 0;
+  private _playOrigin = 0;
   private timerId: ReturnType<typeof setTimeout> | null = null;
   private clipScheduler: ClipScheduler | null = null;
   private clips: ScheduledClip[] = [];
@@ -60,6 +61,11 @@ export class Transport {
     if (this.state === 'stopped') return this.startBeatOffset;
     const elapsed = this.context.currentTime - this.startContextTime;
     return this.startBeatOffset + this.clock.secondsToBeats(elapsed);
+  }
+
+  /** The beat position where playback was initiated from. */
+  get playOrigin(): number {
+    return this._playOrigin;
   }
 
   get isPlaying(): boolean {
@@ -104,6 +110,7 @@ export class Transport {
 
   play(): void {
     if (this.state !== 'stopped') return;
+    this._playOrigin = this.startBeatOffset;
     this.state = 'playing';
     this.startContextTime = this.context.currentTime;
     this.nextScheduleTime = this.context.currentTime;
@@ -113,6 +120,7 @@ export class Transport {
 
   record(): void {
     if (this.state !== 'stopped') return;
+    this._playOrigin = this.startBeatOffset;
     this.state = 'recording';
     this.startContextTime = this.context.currentTime;
     this.nextScheduleTime = this.context.currentTime;
@@ -122,7 +130,8 @@ export class Transport {
 
   stop(): void {
     if (this.state === 'stopped') return;
-    this.startBeatOffset = 0;
+    // Return to where playback started, not where it ended
+    this.startBeatOffset = this._playOrigin;
     this.state = 'stopped';
     if (this.timerId !== null) {
       clearTimeout(this.timerId);
@@ -140,6 +149,7 @@ export class Transport {
       }
     }
     this.startBeatOffset = Math.max(0, beat);
+    this._playOrigin = this.startBeatOffset;
     if (wasPlaying) {
       this.play();
     }

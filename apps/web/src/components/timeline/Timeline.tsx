@@ -2,11 +2,14 @@ import { useRef, useCallback, useEffect, type WheelEvent } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTransportStore } from '@/stores/transportStore';
+import { useTransport } from '@/hooks/useTransport';
 import { TimelineRuler } from './TimelineRuler';
+import { TimelineGrid } from './TimelineGrid';
 import { TrackLane } from './TrackLane';
 import { Playhead } from './Playhead';
 import { LoopRegion } from './LoopRegion';
 import { PeerCursors } from './PeerCursors';
+import { RecordingRegion } from './RecordingRegion';
 
 interface TimelineProps {
   onScrollTop?: (px: number) => void;
@@ -22,7 +25,9 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
   const setScrollLeft = useUiStore((s) => s.setScrollLeft);
   const deselectAll = useUiStore((s) => s.deselectAll);
   const loopEnabled = useTransportStore((s) => s.loopEnabled);
+  const { seek } = useTransport();
   const containerRef = useRef<HTMLDivElement>(null);
+  const trackAreaRef = useRef<HTMLDivElement>(null);
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
@@ -48,11 +53,21 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
 
   const handleBackgroundClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        deselectAll();
+      // Only handle clicks on the track area background, not on clips
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-clip]')) return;
+
+      deselectAll();
+
+      // Seek playhead to clicked position
+      if (trackAreaRef.current) {
+        const rect = trackAreaRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const beat = Math.max(0, x / zoom);
+        seek(beat);
       }
     },
-    [deselectAll],
+    [deselectAll, zoom, seek],
   );
 
   const trackHeight = 80;
@@ -64,11 +79,17 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
       ref={containerRef}
       className="relative flex flex-col overflow-auto bg-zinc-950"
       onWheel={handleWheel}
-      onClick={handleBackgroundClick}
     >
       <TimelineRuler zoom={zoom} scrollLeft={scrollLeft} />
 
-      <div className="relative" style={{ width: totalWidth, minHeight: totalHeight || 200 }}>
+      <div
+        ref={trackAreaRef}
+        className="relative"
+        style={{ width: totalWidth, minHeight: totalHeight || 200 }}
+        onClick={handleBackgroundClick}
+      >
+        <TimelineGrid zoom={zoom} scrollLeft={scrollLeft} totalHeight={totalHeight || 200} />
+
         {tracks.map((track, i) => {
           const trackClips = clips.filter((c) => c.trackId === track.id);
           return (
@@ -83,6 +104,7 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
           );
         })}
 
+        <RecordingRegion zoom={zoom} trackHeight={trackHeight} />
         {loopEnabled && <LoopRegion zoom={zoom} totalHeight={totalHeight} />}
         <PeerCursors zoom={zoom} totalHeight={totalHeight} />
 

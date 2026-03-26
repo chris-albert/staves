@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTransport } from '@/hooks/useTransport';
+import { useTransportStore } from '@/stores/transportStore';
 
 interface TimelineRulerProps {
   zoom: number;
@@ -8,6 +9,7 @@ interface TimelineRulerProps {
 
 export function TimelineRuler({ zoom, scrollLeft }: TimelineRulerProps) {
   const { seek } = useTransport();
+  const playOrigin = useTransportStore((s) => s.playOrigin);
 
   const markers = useMemo(() => {
     const startBeat = Math.floor(scrollLeft / zoom);
@@ -38,6 +40,8 @@ export function TimelineRuler({ zoom, scrollLeft }: TimelineRulerProps) {
     return result;
   }, [zoom, scrollLeft]);
 
+  const originX = playOrigin * zoom - scrollLeft;
+
   return (
     <div
       className="sticky top-0 z-10 h-6 border-b border-zinc-800 bg-zinc-900"
@@ -57,6 +61,24 @@ export function TimelineRuler({ zoom, scrollLeft }: TimelineRulerProps) {
           <div className="h-2 w-px bg-zinc-700" />
         </div>
       ))}
+
+      {/* Play origin marker — shows where playback will return to on stop */}
+      {(
+        <div
+          className="absolute top-0 h-full"
+          style={{ left: originX }}
+        >
+          <div className="h-full w-px bg-blue-400/60" />
+          <div
+            className="absolute top-0 -translate-x-1/2"
+            style={{ left: 0.5 }}
+          >
+            <svg width="7" height="5" viewBox="0 0 7 5" fill="#60a5fa" opacity="0.7">
+              <polygon points="0,0 7,0 3.5,5" />
+            </svg>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

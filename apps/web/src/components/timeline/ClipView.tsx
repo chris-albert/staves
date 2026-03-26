@@ -2,6 +2,7 @@ import { useCallback, useRef, type PointerEvent as ReactPointerEvent } from 'rea
 import type { Clip } from '@staves/storage';
 import { useUiStore } from '@/stores/uiStore';
 import { useProjectStore } from '@/stores/projectStore';
+import { useTransport } from '@/hooks/useTransport';
 import { snapToGrid } from '@/lib/timeUtils';
 import { WaveformCanvas } from '../waveform/WaveformCanvas';
 
@@ -19,6 +20,7 @@ export function ClipView({ clip, color, zoom, laneHeight }: ClipViewProps) {
   const snapDivision = useUiStore((s) => s.snapDivision);
   const updateClip = useProjectStore((s) => s.updateClip);
   const tracks = useProjectStore((s) => s.tracks);
+  const { seek } = useTransport();
   const isSelected = selectedClipIds.has(clip.id);
 
   const dragRef = useRef<{
@@ -42,6 +44,11 @@ export function ClipView({ clip, color, zoom, laneHeight }: ClipViewProps) {
   const onPointerDown = useCallback(
     (e: ReactPointerEvent, type: 'move' | 'trim-left' | 'trim-right' = 'move') => {
       e.stopPropagation();
+      // Cmd/Ctrl+click: seek playhead to clip start
+      if (e.metaKey || e.ctrlKey) {
+        seek(clip.startBeat);
+        return;
+      }
       selectClip(clip.id, e.shiftKey);
       dragRef.current = {
         type,
@@ -54,7 +61,7 @@ export function ClipView({ clip, color, zoom, laneHeight }: ClipViewProps) {
       };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [clip.id, clip.startBeat, clip.durationBeats, clip.offsetBeats, clip.trackId, selectClip],
+    [clip.id, clip.startBeat, clip.durationBeats, clip.offsetBeats, clip.trackId, selectClip, seek],
   );
 
   const onPointerMove = useCallback(
@@ -101,6 +108,7 @@ export function ClipView({ clip, color, zoom, laneHeight }: ClipViewProps) {
 
   return (
     <div
+      data-clip
       className={`group absolute top-1 rounded border transition-shadow cursor-grab active:cursor-grabbing ${
         isSelected ? 'ring-2 ring-white/50' : ''
       }`}

@@ -25,6 +25,28 @@ export const audioBlobStore = {
     return audioBlob;
   },
 
+  /** Store a blob with a specific ID (used when receiving from a remote peer). */
+  async storeWithId(
+    id: string,
+    projectId: string,
+    data: Blob,
+    format: AudioBlob['format'],
+    sampleRate: number,
+    durationSeconds: number,
+  ): Promise<AudioBlob> {
+    const audioBlob: AudioBlob = {
+      id,
+      projectId,
+      data,
+      format,
+      sampleRate,
+      durationSeconds,
+      createdAt: Date.now(),
+    };
+    await db.audioBlobs.put(audioBlob);
+    return audioBlob;
+  },
+
   async get(id: string): Promise<AudioBlob | undefined> {
     return db.audioBlobs.get(id);
   },

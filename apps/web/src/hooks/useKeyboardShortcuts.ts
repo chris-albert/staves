@@ -38,7 +38,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       switch (e.code) {
         case 'Space':
           e.preventDefault();
-          if (handlers.isPlaying) {
+          if (handlers.isRecording) {
+            handlers.onStopRecord();
+          } else if (handlers.isPlaying) {
             handlers.onStop();
           } else {
             handlers.onPlay();

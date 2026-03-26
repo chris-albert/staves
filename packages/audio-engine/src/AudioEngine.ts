@@ -40,7 +40,11 @@ export class AudioEngine {
   async setOutputDevice(deviceId: string): Promise<void> {
     const ctx = this.context as AudioContext & { setSinkId?: (id: string) => Promise<void> };
     if (typeof ctx.setSinkId === 'function') {
-      await ctx.setSinkId(deviceId);
+      try {
+        await ctx.setSinkId(deviceId);
+      } catch {
+        // Context may be closing or device unavailable
+      }
     }
   }
 
