@@ -12,6 +12,8 @@ interface ShortcutHandlers {
   onDelete: () => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
 }
 
 /**
@@ -24,6 +26,8 @@ interface ShortcutHandlers {
  * Cmd/Ctrl+Z  — undo
  * Cmd/Ctrl+Shift+Z — redo
  * Cmd/Ctrl+A  — select all
+ * Cmd/Ctrl+=  — zoom in
+ * Cmd/Ctrl+-  — zoom out
  * Escape      — deselect all
  */
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
@@ -81,6 +85,20 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           if (mod) {
             e.preventDefault();
             handlers.onSelectAll();
+          }
+          break;
+
+        case 'Equal':
+          if (mod) {
+            e.preventDefault();
+            handlers.onZoomIn();
+          }
+          break;
+
+        case 'Minus':
+          if (mod) {
+            e.preventDefault();
+            handlers.onZoomOut();
           }
           break;
 

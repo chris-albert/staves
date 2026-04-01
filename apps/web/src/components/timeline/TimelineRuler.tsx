@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useTransport } from '@/hooks/useTransport';
 import { useTransportStore } from '@/stores/transportStore';
+import { useUiStore } from '@/stores/uiStore';
+import { snapToGrid } from '@/lib/timeUtils';
 
 interface TimelineRulerProps {
   zoom: number;
@@ -10,6 +12,8 @@ interface TimelineRulerProps {
 export function TimelineRuler({ zoom, scrollLeft }: TimelineRulerProps) {
   const { seek } = useTransport();
   const playOrigin = useTransportStore((s) => s.playOrigin);
+  const snapEnabled = useUiStore((s) => s.snapEnabled);
+  const snapDivision = useUiStore((s) => s.snapDivision);
 
   const markers = useMemo(() => {
     const startBeat = Math.floor(scrollLeft / zoom);
@@ -48,7 +52,8 @@ export function TimelineRuler({ zoom, scrollLeft }: TimelineRulerProps) {
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left + scrollLeft;
-        seek(Math.max(0, x / zoom));
+        const beat = Math.max(0, x / zoom);
+        seek(snapEnabled ? snapToGrid(beat, snapDivision) : beat);
       }}
     >
       {markers.map((m) => (
