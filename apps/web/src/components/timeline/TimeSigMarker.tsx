@@ -42,10 +42,13 @@ export function TimeSigMarker({ event, x, onUpdate, onRemove }: TimeSigMarkerPro
     return () => document.removeEventListener('mousedown', handler);
   }, [editing, commit]);
 
+  // Clamp left so the centered marker never overflows past the left edge
+  const clampedX = Math.max(5, x);
+
   return (
     <div
       className="absolute flex items-center"
-      style={{ left: x, top: 0, height: '100%' }}
+      style={{ left: clampedX, top: 0, height: '100%' }}
     >
       <button
         className="group relative -translate-x-1/2 rounded px-1 py-px text-[9px] font-medium text-sky-400/80 hover:bg-zinc-800 hover:text-sky-300"
