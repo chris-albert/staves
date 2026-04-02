@@ -20,6 +20,7 @@ import { Toolbar } from '@/components/layout/Toolbar';
 import { TrackList } from '@/components/tracks/TrackList';
 import { MasterTrack } from '@/components/tracks/MasterTrack';
 import { Timeline } from '@/components/timeline/Timeline';
+import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
 import { rootRoute } from './__root';
 
@@ -239,6 +240,7 @@ function DawEditorPage() {
         }
         trackList={<TrackList onAddTrack={handleAddTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
+        masterLane={<MasterLane />}
         timeline={<Timeline />}
         connectionStatus={connectionStatus}
         peerCount={peerCount}

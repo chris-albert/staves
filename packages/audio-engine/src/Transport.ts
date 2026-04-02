@@ -1,4 +1,4 @@
-import type { AudioClock } from './AudioClock';
+import type { TempoMap } from './TempoMap';
 import type { Metronome } from './Metronome';
 
 export type TransportState = 'stopped' | 'playing' | 'recording';
@@ -27,10 +27,13 @@ type ClipScheduler = (window: ScheduleWindow) => void;
 /**
  * Look-ahead scheduler based on Chris Wilson's "A Tale of Two Clocks".
  * Uses setTimeout (not rAF) so audio keeps playing in background tabs.
+ *
+ * Uses TempoMap for non-linear beat↔seconds conversion so that tempo
+ * ramps and time-signature changes are handled correctly.
  */
 export class Transport {
   private context: AudioContext;
-  private clock: AudioClock;
+  private tempoMap: TempoMap;
   private metronome: Metronome | null;
   private state: TransportState = 'stopped';
   private startContextTime = 0;
@@ -51,16 +54,21 @@ export class Transport {
   private _loopEnd = 0;
   private _loopEnabled = false;
 
-  constructor(context: AudioContext, clock: AudioClock, metronome?: Metronome) {
+  constructor(context: AudioContext, tempoMap: TempoMap, metronome?: Metronome) {
     this.context = context;
-    this.clock = clock;
+    this.tempoMap = tempoMap;
     this.metronome = metronome ?? null;
+  }
+
+  setTempoMap(tempoMap: TempoMap): void {
+    this.tempoMap = tempoMap;
   }
 
   get currentBeat(): number {
     if (this.state === 'stopped') return this.startBeatOffset;
     const elapsed = this.context.currentTime - this.startContextTime;
-    return this.startBeatOffset + this.clock.secondsToBeats(elapsed);
+    const startSeconds = this.tempoMap.beatsToSeconds(this.startBeatOffset);
+    return this.tempoMap.secondsToBeats(startSeconds + elapsed);
   }
 
   /** The beat position where playback was initiated from. */
@@ -114,7 +122,7 @@ export class Transport {
     this.state = 'playing';
     this.startContextTime = this.context.currentTime;
     this.nextScheduleTime = this.context.currentTime;
-    this.lastScheduledMetronomeBeat = Math.floor(this.startBeatOffset) - 1;
+    this.lastScheduledMetronomeBeat = this.startBeatOffset - 1;
     this.scheduleLoop();
   }
 
@@ -124,7 +132,7 @@ export class Transport {
     this.state = 'recording';
     this.startContextTime = this.context.currentTime;
     this.nextScheduleTime = this.context.currentTime;
-    this.lastScheduledMetronomeBeat = Math.floor(this.startBeatOffset) - 1;
+    this.lastScheduledMetronomeBeat = this.startBeatOffset - 1;
     this.scheduleLoop();
   }
 
@@ -157,11 +165,20 @@ export class Transport {
 
   private scheduleLoop(): void {
     const startCtx = this.startContextTime;
-    const offset = this.startBeatOffset;
+    const startSeconds = this.tempoMap.beatsToSeconds(this.startBeatOffset);
 
     while (this.nextScheduleTime < this.context.currentTime + this.scheduleAheadTime) {
-      const windowStartBeat = offset + this.clock.secondsToBeats(this.nextScheduleTime - startCtx);
-      const windowEndBeat = offset + this.clock.secondsToBeats(this.nextScheduleTime + this.scheduleAheadTime - startCtx);
+      const windowElapsed = this.nextScheduleTime - startCtx;
+      const windowEndElapsed = windowElapsed + this.scheduleAheadTime;
+
+      const windowStartBeat = this.tempoMap.secondsToBeats(startSeconds + windowElapsed);
+      const windowEndBeat = this.tempoMap.secondsToBeats(startSeconds + windowEndElapsed);
+
+      // Convert beat → AudioContext time
+      const beatToCtxTime = (beat: number) => {
+        const beatSec = this.tempoMap.beatsToSeconds(beat);
+        return startCtx + (beatSec - startSeconds);
+      };
 
       // Schedule clips
       if (this.clipScheduler) {
@@ -169,20 +186,22 @@ export class Transport {
           clips: this.clips,
           fromBeat: windowStartBeat,
           toBeat: windowEndBeat,
-          beatToContextTime: (beat: number) =>
-            startCtx + this.clock.beatsToSeconds(beat - offset),
+          beatToContextTime: beatToCtxTime,
           context: this.context,
         });
       }
 
-      // Schedule metronome clicks
+      // Schedule metronome clicks (denominator-aware: clicks on each beat unit)
       if (this.metronome) {
-        for (let beat = Math.ceil(windowStartBeat); beat < windowEndBeat; beat++) {
-          if (beat > this.lastScheduledMetronomeBeat && beat >= 0) {
-            const beatTime = startCtx + this.clock.beatsToSeconds(beat - offset);
-            const isDownbeat = beat % this.clock.numerator === 0;
-            this.metronome.scheduleClick(beatTime, isDownbeat);
-            this.lastScheduledMetronomeBeat = beat;
+        const clickLines = this.tempoMap.getBeatLines(
+          Math.max(0, windowStartBeat),
+          windowEndBeat,
+        );
+        for (const line of clickLines) {
+          if (line.beat > this.lastScheduledMetronomeBeat) {
+            const beatTime = beatToCtxTime(line.beat);
+            this.metronome.scheduleClick(beatTime, line.isDownbeat);
+            this.lastScheduledMetronomeBeat = line.beat;
           }
         }
       }

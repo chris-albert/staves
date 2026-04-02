@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { AudioEngine, TrackNode } from '@staves/audio-engine';
+import { AudioEngine, TrackNode, TempoMap } from '@staves/audio-engine';
 import type { ScheduledClip } from '@staves/audio-engine';
 import { audioBlobStore } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
@@ -84,7 +84,12 @@ export function useEngineSync() {
 
     // --- Subscribe to store changes ---
     const unsub = useProjectStore.subscribe((state, prevState) => {
-      const { tracks, clips } = state;
+      const { tracks, clips, tempoEvents, timeSignatureEvents } = state;
+
+      // Sync TempoMap to engine when tempo/timeSig events change
+      if (tempoEvents !== prevState.tempoEvents || timeSignatureEvents !== prevState.timeSignatureEvents) {
+        engine.setTempoMap(new TempoMap(tempoEvents, timeSignatureEvents));
+      }
 
       // Determine if any track is soloed
       const anySoloed = tracks.some((t) => t.isSolo);

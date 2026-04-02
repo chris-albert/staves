@@ -1,10 +1,12 @@
 import { create } from 'zustand';
-import type { Project, Track, Clip } from '@staves/storage';
+import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData } from '@staves/storage';
 
 interface ProjectState {
   project: Project | null;
   tracks: Track[];
   clips: Clip[];
+  tempoEvents: TempoEventData[];
+  timeSignatureEvents: TimeSignatureEventData[];
 }
 
 interface ProjectActions {
@@ -18,19 +20,40 @@ interface ProjectActions {
   addClip: (clip: Clip) => void;
   updateClip: (id: string, changes: Partial<Clip>) => void;
   removeClip: (id: string) => void;
+  setTempoEvents: (events: TempoEventData[]) => void;
+  addTempoEvent: (event: TempoEventData) => void;
+  updateTempoEvent: (id: string, changes: Partial<TempoEventData>) => void;
+  removeTempoEvent: (id: string) => void;
+  setTimeSignatureEvents: (events: TimeSignatureEventData[]) => void;
+  addTimeSignatureEvent: (event: TimeSignatureEventData) => void;
+  updateTimeSignatureEvent: (id: string, changes: Partial<TimeSignatureEventData>) => void;
+  removeTimeSignatureEvent: (id: string) => void;
   reset: () => void;
 }
+
+const defaultTempoEvents: TempoEventData[] = [
+  { id: '_default', beat: 0, bpm: 120, curveType: 'constant' },
+];
+const defaultTimeSigEvents: TimeSignatureEventData[] = [
+  { id: '_default', beat: 0, numerator: 4, denominator: 4 },
+];
 
 const initialState: ProjectState = {
   project: null,
   tracks: [],
   clips: [],
+  tempoEvents: defaultTempoEvents,
+  timeSignatureEvents: defaultTimeSigEvents,
 };
 
 export const useProjectStore = create<ProjectState & ProjectActions>()((set) => ({
   ...initialState,
 
-  setProject: (project) => set({ project }),
+  setProject: (project) => set({
+    project,
+    tempoEvents: project?.tempoEvents ?? defaultTempoEvents,
+    timeSignatureEvents: project?.timeSignatureEvents ?? defaultTimeSigEvents,
+  }),
 
   updateProject: (changes) =>
     set((s) => ({
@@ -62,6 +85,49 @@ export const useProjectStore = create<ProjectState & ProjectActions>()((set) => 
     })),
 
   removeClip: (id) => set((s) => ({ clips: s.clips.filter((c) => c.id !== id) })),
+
+  // Tempo events
+  setTempoEvents: (tempoEvents) => set({ tempoEvents }),
+
+  addTempoEvent: (event) =>
+    set((s) => ({ tempoEvents: [...s.tempoEvents, event] })),
+
+  updateTempoEvent: (id, changes) =>
+    set((s) => ({
+      tempoEvents: s.tempoEvents.map((e) => (e.id === id ? { ...e, ...changes } : e)),
+    })),
+
+  removeTempoEvent: (id) =>
+    set((s) => {
+      const filtered = s.tempoEvents.filter((e) => e.id !== id);
+      // Never remove the beat-0 event
+      if (filtered.length === 0) return s;
+      const sorted = [...filtered].sort((a, b) => a.beat - b.beat);
+      if (sorted[0]!.beat !== 0) return s;
+      return { tempoEvents: filtered };
+    }),
+
+  // Time signature events
+  setTimeSignatureEvents: (timeSignatureEvents) => set({ timeSignatureEvents }),
+
+  addTimeSignatureEvent: (event) =>
+    set((s) => ({ timeSignatureEvents: [...s.timeSignatureEvents, event] })),
+
+  updateTimeSignatureEvent: (id, changes) =>
+    set((s) => ({
+      timeSignatureEvents: s.timeSignatureEvents.map((e) =>
+        e.id === id ? { ...e, ...changes } : e,
+      ),
+    })),
+
+  removeTimeSignatureEvent: (id) =>
+    set((s) => {
+      const filtered = s.timeSignatureEvents.filter((e) => e.id !== id);
+      if (filtered.length === 0) return s;
+      const sorted = [...filtered].sort((a, b) => a.beat - b.beat);
+      if (sorted[0]!.beat !== 0) return s;
+      return { timeSignatureEvents: filtered };
+    }),
 
   reset: () => set(initialState),
 }));

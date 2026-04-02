@@ -1,10 +1,19 @@
+import type { TempoMap } from '@staves/audio-engine';
+
 /**
  * Format a beat position as bars:beats:sixteenths.
+ * When a TempoMap is provided, uses it for correct bar/beat counting
+ * across time signature changes.
  */
 export function formatBeatPosition(
   beat: number,
-  numerator: number = 4,
+  tempoMapOrNumerator?: TempoMap | number,
 ): string {
+  if (tempoMapOrNumerator != null && typeof tempoMapOrNumerator === 'object') {
+    const pos = tempoMapOrNumerator.beatsToBarBeat(beat);
+    return `${pos.bar}.${pos.beat}.${pos.subBeat}`;
+  }
+  const numerator = (tempoMapOrNumerator as number) ?? 4;
   const bar = Math.floor(beat / numerator) + 1;
   const beatInBar = Math.floor(beat % numerator) + 1;
   const sixteenth = Math.floor((beat % 1) * 4) + 1;
