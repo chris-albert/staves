@@ -47,6 +47,8 @@ function DawEditorPage() {
   const selectedClipIds = useUiStore((s) => s.selectedClipIds);
   const deselectAll = useUiStore((s) => s.deselectAll);
   const selectClip = useUiStore((s) => s.selectClip);
+  const zoom = useUiStore((s) => s.zoom);
+  const setZoom = useUiStore((s) => s.setZoom);
 
   // Preferences window
   const [prefsOpen, setPrefsOpen] = useState(false);
@@ -188,6 +190,10 @@ function DawEditorPage() {
     }
   }, [roomId]);
 
+  // --- Zoom ---
+  const handleZoomIn = useCallback(() => setZoom(zoom * 1.25), [zoom, setZoom]);
+  const handleZoomOut = useCallback(() => setZoom(zoom / 1.25), [zoom, setZoom]);
+
   // --- Keyboard shortcuts ---
   const shortcutHandlers = useMemo(
     () => ({
@@ -202,8 +208,10 @@ function DawEditorPage() {
       onDelete: handleDeleteSelected,
       onSelectAll: handleSelectAll,
       onDeselectAll: deselectAll,
+      onZoomIn: handleZoomIn,
+      onZoomOut: handleZoomOut,
     }),
-    [play, stop, isPlaying, handleRecord, handleStopRecord, isRecording, undo, redo, handleDeleteSelected, handleSelectAll, deselectAll],
+    [play, stop, isPlaying, handleRecord, handleStopRecord, isRecording, undo, redo, handleDeleteSelected, handleSelectAll, deselectAll, handleZoomIn, handleZoomOut],
   );
   useKeyboardShortcuts(shortcutHandlers);
 

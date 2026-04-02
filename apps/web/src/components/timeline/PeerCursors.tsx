@@ -2,17 +2,18 @@ import { useUiStore } from '@/stores/uiStore';
 
 interface PeerCursorsProps {
   zoom: number;
+  scrollLeft: number;
   totalHeight: number;
 }
 
-export function PeerCursors({ zoom, totalHeight }: PeerCursorsProps) {
+export function PeerCursors({ zoom, scrollLeft, totalHeight }: PeerCursorsProps) {
   const peerCursors = useUiStore((s) => s.peerCursors);
 
   return (
     <>
       {peerCursors.map((peer) => {
         if (peer.beat === null) return null;
-        const x = peer.beat * zoom;
+        const x = peer.beat * zoom - scrollLeft;
 
         return (
           <div key={peer.clientId} className="pointer-events-none absolute top-0 z-15" style={{ left: x }}>

@@ -3,6 +3,7 @@ import { useProjectStore } from '@/stores/projectStore';
 
 interface RecordingRegionProps {
   zoom: number;
+  scrollLeft: number;
   trackHeight: number;
 }
 
@@ -10,7 +11,7 @@ interface RecordingRegionProps {
  * Shows a red translucent region on the armed track's lane
  * that grows as recording progresses.
  */
-export function RecordingRegion({ zoom, trackHeight }: RecordingRegionProps) {
+export function RecordingRegion({ zoom, scrollLeft, trackHeight }: RecordingRegionProps) {
   const isRecording = useTransportStore((s) => s.isRecording);
   const startBeat = useTransportStore((s) => s.recordingStartBeat);
   const trackId = useTransportStore((s) => s.recordingTrackId);
@@ -22,7 +23,7 @@ export function RecordingRegion({ zoom, trackHeight }: RecordingRegionProps) {
   const trackIndex = tracks.findIndex((t) => t.id === trackId);
   if (trackIndex === -1) return null;
 
-  const left = startBeat * zoom;
+  const left = startBeat * zoom - scrollLeft;
   const width = Math.max(0, (currentBeat - startBeat) * zoom);
   const top = trackIndex * trackHeight;
 

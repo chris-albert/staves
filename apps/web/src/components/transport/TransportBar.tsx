@@ -1,6 +1,7 @@
 import { PlayButton } from './PlayButton';
 import { RecordButton } from './RecordButton';
 import { BpmControl } from './BpmControl';
+import { SnapControl } from './SnapControl';
 import { TimeDisplay } from './TimeDisplay';
 import { useTransport } from '@/hooks/useTransport';
 
@@ -68,6 +69,8 @@ export function TransportBar({ isRecording, hasArmedTrack, onRecord, onStopRecor
       <TimeDisplay />
       <div className="mx-1 h-5 w-px bg-zinc-800" />
       <BpmControl bpm={bpm} onChange={setBpm} />
+      <div className="mx-1 h-5 w-px bg-zinc-800" />
+      <SnapControl />
 
       {/* Recording indicator — always rendered to prevent layout shift */}
       <div className={`ml-2 flex items-center gap-1.5 rounded-full px-2.5 py-1 transition-opacity ${

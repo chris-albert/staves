@@ -10,10 +10,11 @@ interface ClipViewProps {
   clip: Clip;
   color: string;
   zoom: number;
+  scrollLeft: number;
   laneHeight: number;
 }
 
-export function ClipView({ clip, color, zoom, laneHeight }: ClipViewProps) {
+export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipViewProps) {
   const selectedClipIds = useUiStore((s) => s.selectedClipIds);
   const selectClip = useUiStore((s) => s.selectClip);
   const snapEnabled = useUiStore((s) => s.snapEnabled);
@@ -33,7 +34,7 @@ export function ClipView({ clip, color, zoom, laneHeight }: ClipViewProps) {
     origTrackId: string;
   } | null>(null);
 
-  const left = clip.startBeat * zoom;
+  const left = clip.startBeat * zoom - scrollLeft;
   const width = clip.durationBeats * zoom;
 
   const snap = useCallback(
