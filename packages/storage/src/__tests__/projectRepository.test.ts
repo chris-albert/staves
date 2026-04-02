@@ -90,6 +90,7 @@ describe('projectRepository', () => {
         durationBeats: 4,
         offsetBeats: 0,
         gainDb: 0,
+        sourceDurationBeats: 4,
       });
       await projectRepository.deleteTrack(track.id);
       const tracks = await projectRepository.getTracks(project.id);
@@ -112,6 +113,7 @@ describe('projectRepository', () => {
         durationBeats: 8,
         offsetBeats: 0,
         gainDb: -3,
+        sourceDurationBeats: 8,
       });
       expect(clip.startBeat).toBe(4);
 
@@ -132,6 +134,7 @@ describe('projectRepository', () => {
         durationBeats: 4,
         offsetBeats: 0,
         gainDb: 0,
+        sourceDurationBeats: 4,
       });
       await projectRepository.updateClip(clip.id, { startBeat: 8 });
       const clips = await projectRepository.getClipsForTrack(track.id);
