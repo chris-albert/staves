@@ -13,7 +13,7 @@ export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
  * Creates a SyncProvider (Yjs + WebRTC) and binds it to the project store.
  * Handles transport sync and audio blob transfer between peers.
  */
-export function useSync(roomId: string | null) {
+export function useSync(roomId: string | null, isJoining = false) {
   const providerRef = useRef<SyncProvider | null>(null);
   const blobTransferRef = useRef<BlobTransferService | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
@@ -46,6 +46,7 @@ export function useSync(roomId: string | null) {
       provider.doc,
       useProjectStore.getState,
       (listener) => useProjectStore.subscribe(listener),
+      { isJoining, provider: provider.provider },
     );
 
     // Transport sync — remote play/stop/record commands
@@ -153,7 +154,7 @@ export function useSync(roomId: string | null) {
       setStatus('disconnected');
       setPeerCount(0);
     };
-  }, [roomId]);
+  }, [roomId, isJoining]);
 
   const getProvider = useCallback(() => providerRef.current, []);
   const getBlobTransfer = useCallback(() => blobTransferRef.current, []);
