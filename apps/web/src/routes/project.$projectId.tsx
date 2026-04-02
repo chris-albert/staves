@@ -19,7 +19,9 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Toolbar } from '@/components/layout/Toolbar';
 import { TrackList } from '@/components/tracks/TrackList';
 import { MasterTrack } from '@/components/tracks/MasterTrack';
+import { MetronomeTrack } from '@/components/tracks/MetronomeTrack';
 import { Timeline } from '@/components/timeline/Timeline';
+import { MetronomeLane } from '@/components/timeline/MetronomeLane';
 import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
 import { rootRoute } from './__root';
@@ -134,6 +136,7 @@ function DawEditorPage() {
       durationBeats: result.durationBeats,
       offsetBeats: 0,
       gainDb: 0,
+      sourceDurationBeats: result.durationBeats,
     });
     addClip(clip);
 
@@ -239,6 +242,8 @@ function DawEditorPage() {
           />
         }
         trackList={<TrackList onAddTrack={handleAddTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
+        metronomeTrack={<MetronomeTrack />}
+        metronomeLane={<MetronomeLane />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         masterLane={<MasterLane />}
         timeline={<Timeline />}

@@ -5,9 +5,13 @@ interface WaveformCanvasProps {
   audioBlobId: string;
   width: number;
   height: number;
+  /** Fraction of source audio before the visible region (0–1). */
+  offsetRatio?: number;
+  /** Fraction of source audio that is visible (0–1). */
+  visibleRatio?: number;
 }
 
-export function WaveformCanvas({ audioBlobId, width, height }: WaveformCanvasProps) {
+export function WaveformCanvas({ audioBlobId, width, height, offsetRatio = 0, visibleRatio = 1 }: WaveformCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const peaks = useWaveformData(audioBlobId);
 
@@ -27,15 +31,18 @@ export function WaveformCanvas({ audioBlobId, width, height }: WaveformCanvasPro
     ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
 
     const mid = height / 2;
-    const step = peaks.length / width;
+    // Only sample peaks from the visible portion of the source audio
+    const startIdx = Math.floor(offsetRatio * peaks.length);
+    const visiblePeakCount = Math.floor(visibleRatio * peaks.length);
+    const step = visiblePeakCount / width;
 
     for (let x = 0; x < width; x++) {
-      const idx = Math.floor(x * step);
+      const idx = startIdx + Math.floor(x * step);
       const peak = peaks[idx] ?? 0;
       const h = peak * mid;
       ctx.fillRect(x, mid - h, 1, h * 2);
     }
-  }, [peaks, width, height]);
+  }, [peaks, width, height, offsetRatio, visibleRatio]);
 
   if (width <= 0 || height <= 0) return null;
 

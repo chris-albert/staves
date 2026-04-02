@@ -5,6 +5,8 @@ import type { ConnectionStatus } from '@/hooks/useSync';
 interface AppShellProps {
   toolbar: ReactNode;
   trackList: ReactNode;
+  metronomeTrack: ReactNode;
+  metronomeLane: ReactNode;
   masterTrack: ReactNode;
   masterLane: ReactNode;
   timeline: ReactNode;
@@ -14,7 +16,7 @@ interface AppShellProps {
   onShareRoom: () => void;
 }
 
-export function AppShell({ toolbar, trackList, masterTrack, masterLane, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
+export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, masterTrack, masterLane, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
   const trackListRef = useRef<HTMLDivElement>(null);
   const [, setScrollTop] = useState(0);
 
@@ -45,6 +47,15 @@ export function AppShell({ toolbar, trackList, masterTrack, masterLane, timeline
           {/* Timeline area */}
           <div className="flex-1 overflow-hidden bg-zinc-950">
             {timeline}
+          </div>
+        </div>
+        {/* Metronome row pinned above master */}
+        <div className="flex flex-shrink-0">
+          <div className="w-60 flex-shrink-0 border-r border-zinc-800/80">
+            {metronomeTrack}
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {metronomeLane}
           </div>
         </div>
         {/* Master row pinned at bottom: sidebar controls + tempo/time sig lane */}

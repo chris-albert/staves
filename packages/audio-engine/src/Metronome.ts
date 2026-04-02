@@ -3,12 +3,17 @@ export class Metronome {
   private context: AudioContext;
   private _enabled = false;
   private gainNode: GainNode;
+  private readonly analyser: AnalyserNode;
 
   constructor(context: AudioContext, destination: AudioNode) {
     this.context = context;
     this.gainNode = context.createGain();
     this.gainNode.gain.value = 0.5;
     this.gainNode.connect(destination);
+    // Metering tap
+    this.analyser = context.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.gainNode.connect(this.analyser);
   }
 
   get enabled(): boolean {
@@ -43,5 +48,16 @@ export class Metronome {
 
   set volume(v: number) {
     this.gainNode.gain.value = v;
+  }
+
+  /** Returns mono RMS level (0–1) for metering. */
+  getLevel(): number {
+    const data = new Float32Array(this.analyser.fftSize);
+    this.analyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+      sum += data[i]! * data[i]!;
+    }
+    return Math.sqrt(sum / data.length);
   }
 }

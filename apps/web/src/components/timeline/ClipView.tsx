@@ -86,21 +86,26 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
 
         updateClip(clip.id, { startBeat: newStart, trackId: newTrackId });
       } else if (d.type === 'trim-left') {
-        const newStart = snap(Math.max(0, d.origStartBeat + dBeats));
-        const delta = newStart - d.origStartBeat;
-        const newDuration = Math.max(0.25, d.origDurationBeats - delta);
-        const newOffset = Math.max(0, d.origOffsetBeats + delta);
+        const rawStart = snap(Math.max(0, d.origStartBeat + dBeats));
+        const delta = rawStart - d.origStartBeat;
+        // Clamp: offset can't go below 0
+        const clampedDelta = Math.max(-d.origOffsetBeats, delta);
+        const newOffset = d.origOffsetBeats + clampedDelta;
+        const newDuration = Math.max(0.25, d.origDurationBeats - clampedDelta);
+        const newStart = d.origStartBeat + clampedDelta;
         updateClip(clip.id, {
           startBeat: newStart,
           durationBeats: newDuration,
           offsetBeats: newOffset,
         });
       } else if (d.type === 'trim-right') {
-        const newDuration = snap(Math.max(0.25, d.origDurationBeats + dBeats));
+        // Clamp duration so offset + duration doesn't exceed source length
+        const maxDuration = clip.sourceDurationBeats - d.origOffsetBeats;
+        const newDuration = snap(Math.min(maxDuration, Math.max(0.25, d.origDurationBeats + dBeats)));
         updateClip(clip.id, { durationBeats: newDuration });
       }
     },
-    [clip.id, zoom, snap, updateClip, tracks, laneHeight],
+    [clip.id, clip.sourceDurationBeats, zoom, snap, updateClip, tracks, laneHeight],
   );
 
   const onPointerUp = useCallback(() => {
@@ -137,7 +142,13 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
       />
 
       <div className="truncate px-2 text-[10px] text-zinc-300">{clip.name}</div>
-      <WaveformCanvas audioBlobId={clip.audioBlobId} width={width} height={laneHeight - 24} />
+      <WaveformCanvas
+        audioBlobId={clip.audioBlobId}
+        width={width}
+        height={laneHeight - 24}
+        offsetRatio={clip.sourceDurationBeats > 0 ? clip.offsetBeats / clip.sourceDurationBeats : 0}
+        visibleRatio={clip.sourceDurationBeats > 0 ? clip.durationBeats / clip.sourceDurationBeats : 1}
+      />
     </div>
   );
 }

@@ -52,6 +52,8 @@ export interface Clip {
   durationBeats: number;
   offsetBeats: number;
   gainDb: number;
+  /** Total duration of the source audio in beats (for non-destructive trim). */
+  sourceDurationBeats: number;
 }
 
 export interface AudioBlob {
@@ -138,6 +140,22 @@ db.version(4).stores({
         numerator: project.timeSignatureNumerator || 4,
         denominator: project.timeSignatureDenominator || 4,
       }];
+    }
+  });
+});
+
+// Migrate existing clips to include sourceDurationBeats
+db.version(5).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+}).upgrade((tx) => {
+  return tx.table('clips').toCollection().modify((clip) => {
+    if (clip.sourceDurationBeats === undefined) {
+      // For existing clips, the current offsetBeats + durationBeats represents the full source extent
+      clip.sourceDurationBeats = clip.offsetBeats + clip.durationBeats;
     }
   });
 });
