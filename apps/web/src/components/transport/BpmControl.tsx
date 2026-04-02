@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTransportStore } from '@/stores/transportStore';
 
 interface BpmControlProps {
   bpm: number;
@@ -7,17 +8,19 @@ interface BpmControlProps {
 
 export function BpmControl({ bpm, onChange }: BpmControlProps) {
   const [editing, setEditing] = useState(false);
-  const [inputValue, setInputValue] = useState(String(bpm));
+  const [inputValue, setInputValue] = useState(String(Math.round(bpm)));
+  const isPlaying = useTransportStore((s) => s.isPlaying);
+  const displayBpm = Math.round(bpm);
 
   const commit = useCallback(() => {
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed) && parsed >= 20 && parsed <= 300) {
       onChange(parsed);
     } else {
-      setInputValue(String(bpm));
+      setInputValue(String(displayBpm));
     }
     setEditing(false);
-  }, [inputValue, bpm, onChange]);
+  }, [inputValue, displayBpm, onChange]);
 
   if (editing) {
     return (
@@ -29,7 +32,7 @@ export function BpmControl({ bpm, onChange }: BpmControlProps) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit();
           if (e.key === 'Escape') {
-            setInputValue(String(bpm));
+            setInputValue(String(displayBpm));
             setEditing(false);
           }
         }}
@@ -42,13 +45,18 @@ export function BpmControl({ bpm, onChange }: BpmControlProps) {
   return (
     <button
       onClick={() => {
-        setInputValue(String(bpm));
+        if (isPlaying) return; // read-only during playback
+        setInputValue(String(displayBpm));
         setEditing(true);
       }}
-      className="rounded px-1.5 py-0.5 font-mono text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors tabular-nums"
-      title="Click to edit BPM"
+      className={`rounded px-1.5 py-0.5 font-mono text-xs transition-colors tabular-nums ${
+        isPlaying
+          ? 'text-zinc-500 cursor-default'
+          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+      }`}
+      title={isPlaying ? 'BPM (read-only during playback)' : 'Click to edit BPM'}
     >
-      {bpm} <span className="text-zinc-600">bpm</span>
+      {displayBpm} <span className="text-zinc-600">bpm</span>
     </button>
   );
 }

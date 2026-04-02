@@ -5,5 +5,7 @@ export { TrackNode } from './TrackNode';
 export { MasterBus } from './MasterBus';
 export { ClipPlayer } from './ClipPlayer';
 export { Metronome } from './Metronome';
+export { TempoMap } from './TempoMap';
+export type { TempoEvent, TimeSignatureEvent } from './TempoMap';
 export { AudioClock } from './AudioClock';
 export { Recorder } from './Recorder';

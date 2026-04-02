@@ -1,10 +1,11 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTransportStore } from '@/stores/transportStore';
 import { useTransport } from '@/hooks/useTransport';
 import { snapToGrid } from '@/lib/timeUtils';
 import { TimelineRuler } from './TimelineRuler';
+
 import { TimelineGrid } from './TimelineGrid';
 import { TrackLane } from './TrackLane';
 import { Playhead } from './Playhead';
@@ -31,6 +32,20 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
   const { seek } = useTransport();
   const containerRef = useRef<HTMLDivElement>(null);
   const trackAreaRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
+
+  // Track container size so the track area fills the visible space
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Use a ref for wheel handler so it always has fresh state values without re-registering
   const wheelStateRef = useRef({ zoom, scrollLeft });
@@ -86,7 +101,10 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
   );
 
   const trackHeight = 80;
-  const totalHeight = tracks.length * trackHeight;
+  const rulerHeight = 24;
+  const trackContentHeight = tracks.length * trackHeight;
+  const availableHeight = Math.max(containerHeight - rulerHeight, 200);
+  const trackAreaMinHeight = Math.max(trackContentHeight, availableHeight);
 
   return (
     <div
@@ -98,10 +116,10 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
       <div
         ref={trackAreaRef}
         className="relative"
-        style={{ width: '100%', minHeight: totalHeight || 200 }}
+        style={{ width: '100%', minHeight: trackAreaMinHeight }}
         onClick={handleBackgroundClick}
       >
-        <TimelineGrid zoom={zoom} scrollLeft={scrollLeft} totalHeight={totalHeight || 200} />
+        <TimelineGrid zoom={zoom} scrollLeft={scrollLeft} />
 
         {tracks.map((track, i) => {
           const trackClips = clips.filter((c) => c.trackId === track.id);
@@ -119,13 +137,12 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
         })}
 
         <RecordingRegion zoom={zoom} scrollLeft={scrollLeft} trackHeight={trackHeight} />
-        {loopEnabled && <LoopRegion zoom={zoom} scrollLeft={scrollLeft} totalHeight={totalHeight} />}
-        <PeerCursors zoom={zoom} scrollLeft={scrollLeft} totalHeight={totalHeight} />
+        {loopEnabled && <LoopRegion zoom={zoom} scrollLeft={scrollLeft} />}
+        <PeerCursors zoom={zoom} scrollLeft={scrollLeft} />
 
         <Playhead
           zoom={zoom}
           scrollLeft={scrollLeft}
-          totalHeight={totalHeight}
         />
       </div>
     </div>

@@ -1,15 +1,11 @@
-import type { AudioClock } from './AudioClock';
-
 /** Generates metronome clicks using OscillatorNode. */
 export class Metronome {
   private context: AudioContext;
-  private clock: AudioClock;
   private _enabled = false;
   private gainNode: GainNode;
 
-  constructor(context: AudioContext, clock: AudioClock, destination: AudioNode) {
+  constructor(context: AudioContext, destination: AudioNode) {
     this.context = context;
-    this.clock = clock;
     this.gainNode = context.createGain();
     this.gainNode.gain.value = 0.5;
     this.gainNode.connect(destination);

@@ -1,5 +1,19 @@
 import Dexie, { type EntityTable } from 'dexie';
 
+export interface TempoEventData {
+  id: string;
+  beat: number;
+  bpm: number;
+  curveType: 'constant' | 'linear';
+}
+
+export interface TimeSignatureEventData {
+  id: string;
+  beat: number;
+  numerator: number;
+  denominator: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -9,6 +23,8 @@ export interface Project {
   sampleRate: number;
   createdAt: number;
   updatedAt: number;
+  tempoEvents?: TempoEventData[];
+  timeSignatureEvents?: TimeSignatureEventData[];
 }
 
 export interface Track {
@@ -94,6 +110,34 @@ db.version(3).stores({
   return tx.table('tracks').toCollection().modify((track) => {
     if (track.inputChannel === undefined) {
       track.inputChannel = -1;
+    }
+  });
+});
+
+// Migrate existing projects to include tempo/time-signature event arrays
+db.version(4).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+}).upgrade((tx) => {
+  return tx.table('projects').toCollection().modify((project) => {
+    if (!project.tempoEvents) {
+      project.tempoEvents = [{
+        id: crypto.randomUUID(),
+        beat: 0,
+        bpm: project.bpm || 120,
+        curveType: 'constant',
+      }];
+    }
+    if (!project.timeSignatureEvents) {
+      project.timeSignatureEvents = [{
+        id: crypto.randomUUID(),
+        beat: 0,
+        numerator: project.timeSignatureNumerator || 4,
+        denominator: project.timeSignatureDenominator || 4,
+      }];
     }
   });
 });

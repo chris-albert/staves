@@ -4,6 +4,7 @@ import { useTransportStore } from '@/stores/transportStore';
 
 /**
  * Syncs the transport store's currentBeat with the AudioEngine via rAF.
+ * Also updates the display BPM to reflect the tempo at the current playhead.
  * Only runs while playing.
  */
 export function usePlayheadPosition() {
@@ -16,7 +17,12 @@ export function usePlayheadPosition() {
     const tick = () => {
       try {
         const engine = AudioEngine.getInstance();
-        useTransportStore.getState().setCurrentBeat(engine.transport.currentBeat);
+        const beat = engine.transport.currentBeat;
+        useTransportStore.getState().setCurrentBeat(beat);
+        // Update display BPM to show the interpolated tempo at the playhead
+        useTransportStore.getState().setBpm(
+          Math.round(engine.tempoMap.tempoAtBeat(beat) * 10) / 10,
+        );
       } catch {
         // Engine not ready
       }

@@ -3,13 +3,11 @@ import * as Y from 'yjs';
 interface TransportStoreState {
   isPlaying: boolean;
   isRecording: boolean;
-  bpm: number;
 }
 
 interface TransportStoreActions {
   setPlaying: (playing: boolean) => void;
   setRecording: (recording: boolean) => void;
-  setBpm: (bpm: number) => void;
 }
 
 type TransportStore = TransportStoreState & TransportStoreActions;
@@ -24,6 +22,9 @@ export interface TransportSyncCallbacks {
  * Bidirectional binding between Yjs shared map and transport store.
  * Transport commands (play/stop/record) sync between all peers.
  * Each peer runs its own local audio engine — only the command is synced.
+ *
+ * Note: BPM is no longer synced here — tempo events are synced as part
+ * of the project via projectSync.
  */
 export function transportSync(
   doc: Y.Doc,
@@ -42,12 +43,7 @@ export function transportSync(
     const isPlaying = yTransport.get('isPlaying') as boolean | undefined;
     const isRecording = yTransport.get('isRecording') as boolean | undefined;
     const startBeat = (yTransport.get('startBeat') as number) ?? 0;
-    const bpm = yTransport.get('bpm') as number | undefined;
     const state = getState();
-
-    if (bpm !== undefined && bpm !== state.bpm) {
-      state.setBpm(bpm);
-    }
 
     if (isRecording && !state.isRecording && !state.isPlaying) {
       // Remote peer started recording — we just play along
@@ -76,9 +72,6 @@ export function transportSync(
       }
       if (yTransport.get('isRecording') !== state.isRecording) {
         yTransport.set('isRecording', state.isRecording);
-      }
-      if (yTransport.get('bpm') !== state.bpm) {
-        yTransport.set('bpm', state.bpm);
       }
     });
 

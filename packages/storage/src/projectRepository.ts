@@ -23,6 +23,12 @@ export const projectRepository = {
       sampleRate: 48000,
       createdAt: now,
       updatedAt: now,
+      tempoEvents: [
+        { id: generateId(), beat: 0, bpm, curveType: 'constant' as const },
+      ],
+      timeSignatureEvents: [
+        { id: generateId(), beat: 0, numerator: 4, denominator: 4 },
+      ],
     };
     await db.projects.add(project);
     return project;

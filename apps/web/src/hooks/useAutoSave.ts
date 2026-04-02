@@ -6,7 +6,7 @@ const DEBOUNCE_MS = 1000;
 
 /**
  * Debounced auto-save: persists projectStore changes to IndexedDB.
- * Runs whenever project, tracks, or clips change.
+ * Runs whenever project, tracks, clips, or tempo/timeSig events change.
  */
 export function useAutoSave() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -18,13 +18,15 @@ export function useAutoSave() {
       const projectChanged = state.project !== prev.project;
       const tracksChanged = state.tracks !== prev.tracks;
       const clipsChanged = state.clips !== prev.clips;
+      const tempoChanged = state.tempoEvents !== prev.tempoEvents;
+      const timeSigChanged = state.timeSignatureEvents !== prev.timeSignatureEvents;
 
-      if (!projectChanged && !tracksChanged && !clipsChanged) return;
+      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged) return;
 
       if (timerRef.current) clearTimeout(timerRef.current);
 
       timerRef.current = setTimeout(async () => {
-        const { project, tracks, clips } = useProjectStore.getState();
+        const { project, tracks, clips, tempoEvents, timeSignatureEvents } = useProjectStore.getState();
         if (!project) return;
 
         try {
@@ -33,6 +35,8 @@ export function useAutoSave() {
             bpm: project.bpm,
             timeSignatureNumerator: project.timeSignatureNumerator,
             timeSignatureDenominator: project.timeSignatureDenominator,
+            tempoEvents,
+            timeSignatureEvents,
           });
 
           for (const track of tracks) {

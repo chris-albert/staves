@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTransport } from '@/hooks/useTransport';
 import { useTransportStore } from '@/stores/transportStore';
 import { useUiStore } from '@/stores/uiStore';
+import { useTempoMap } from '@/hooks/useTempoMap';
 import { snapToGrid } from '@/lib/timeUtils';
 
 interface TimelineRulerProps {
@@ -14,35 +15,42 @@ export function TimelineRuler({ zoom, scrollLeft }: TimelineRulerProps) {
   const playOrigin = useTransportStore((s) => s.playOrigin);
   const snapEnabled = useUiStore((s) => s.snapEnabled);
   const snapDivision = useUiStore((s) => s.snapDivision);
+  const tempoMap = useTempoMap();
 
   const markers = useMemo(() => {
-    const startBeat = Math.floor(scrollLeft / zoom);
-    const visibleBeats = Math.ceil(window.innerWidth / zoom) + 2;
+    const startBeat = scrollLeft / zoom - 1;
+    const endBeat = (scrollLeft + window.innerWidth) / zoom + 1;
     const result: { beat: number; x: number; label: string }[] = [];
 
-    for (let i = 0; i < visibleBeats; i++) {
-      const beat = startBeat + i;
-      if (beat < 0) continue;
-      const bar = Math.floor(beat / 4) + 1;
-      const beatInBar = (beat % 4) + 1;
+    // Get bar lines from the TempoMap (respects time signature changes)
+    const barLines = tempoMap.getBarLines(Math.max(0, startBeat), endBeat);
+    const barBeatSet = new Set(barLines.map((b) => Math.round(b.beat * 1e10)));
 
-      if (beat % 4 === 0) {
+    for (const bar of barLines) {
+      result.push({
+        beat: bar.beat,
+        x: bar.beat * zoom - scrollLeft,
+        label: String(bar.bar),
+      });
+    }
+
+    // Add beat labels when zoomed in (uses getBeatLines for denominator-aware spacing)
+    if (zoom >= 30) {
+      const beatLines = tempoMap.getBeatLines(Math.max(0, startBeat), endBeat);
+      for (const line of beatLines) {
+        const key = Math.round(line.beat * 1e10);
+        if (barBeatSet.has(key)) continue;
+        const { bar, beat: beatInBar } = tempoMap.beatsToBarBeat(line.beat);
         result.push({
-          beat,
-          x: beat * zoom - scrollLeft,
-          label: String(bar),
-        });
-      } else if (zoom >= 30) {
-        result.push({
-          beat,
-          x: beat * zoom - scrollLeft,
+          beat: line.beat,
+          x: line.beat * zoom - scrollLeft,
           label: `${bar}.${beatInBar}`,
         });
       }
     }
 
     return result;
-  }, [zoom, scrollLeft]);
+  }, [zoom, scrollLeft, tempoMap]);
 
   const originX = playOrigin * zoom - scrollLeft;
 

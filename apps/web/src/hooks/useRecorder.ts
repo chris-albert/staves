@@ -80,11 +80,12 @@ export function useRecorder() {
       audioBuffer.duration,
     );
 
-    // Use the decoded audio duration (in seconds) converted to beats as the
-    // authoritative clip length — this is more accurate than transport beat
-    // delta because the transport may have been stopped slightly before/after.
-    const bpm = useTransportStore.getState().bpm;
-    const durationBeatsFromAudio = (audioBuffer.duration / 60) * bpm;
+    // Use the decoded audio duration (in seconds) converted to beats via
+    // the TempoMap — this is more accurate than transport beat delta
+    // because the transport may have been stopped slightly before/after.
+    const startSeconds = engine.tempoMap.beatsToSeconds(startBeatRef.current);
+    const endBeatFromAudio = engine.tempoMap.secondsToBeats(startSeconds + audioBuffer.duration);
+    const durationBeatsFromAudio = endBeatFromAudio - startBeatRef.current;
 
     // Fall back to transport-based duration if audio-based one looks wrong
     const transportDuration = endBeat - startBeatRef.current;

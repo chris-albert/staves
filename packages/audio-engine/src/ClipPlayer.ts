@@ -1,16 +1,20 @@
-import type { AudioClock } from './AudioClock';
+import type { TempoMap } from './TempoMap';
 import type { ScheduledClip } from './Transport';
 
 /** Decodes audio blobs and schedules AudioBufferSourceNodes for playback. */
 export class ClipPlayer {
   private context: AudioContext;
-  private clock: AudioClock;
+  private tempoMap: TempoMap;
   private decodedBuffers = new Map<string, AudioBuffer>();
   private activeNodes = new Map<string, AudioBufferSourceNode>();
 
-  constructor(context: AudioContext, clock: AudioClock) {
+  constructor(context: AudioContext, tempoMap: TempoMap) {
     this.context = context;
-    this.clock = clock;
+    this.tempoMap = tempoMap;
+  }
+
+  setTempoMap(tempoMap: TempoMap): void {
+    this.tempoMap = tempoMap;
   }
 
   /** Decode an audio blob and cache the resulting AudioBuffer. */
@@ -44,8 +48,11 @@ export class ClipPlayer {
     source.connect(gain);
     gain.connect(destination);
 
-    const offsetSeconds = this.clock.beatsToSeconds(clip.offsetBeats);
-    const durationSeconds = this.clock.beatsToSeconds(clip.durationBeats);
+    // Audio buffers don't time-stretch — use the tempo at the clip's
+    // start position to convert beat-based offset/duration to seconds.
+    const tempoAtClip = this.tempoMap.tempoAtBeat(clip.startBeat);
+    const offsetSeconds = clip.offsetBeats * 60 / tempoAtClip;
+    const durationSeconds = clip.durationBeats * 60 / tempoAtClip;
 
     source.start(contextStartTime, offsetSeconds, durationSeconds);
     this.activeNodes.set(clip.clipId, source);

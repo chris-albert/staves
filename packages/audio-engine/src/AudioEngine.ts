@@ -1,6 +1,6 @@
 import { MasterBus } from './MasterBus';
 import { Transport } from './Transport';
-import { AudioClock } from './AudioClock';
+import { TempoMap } from './TempoMap';
 import { Metronome } from './Metronome';
 import { ClipPlayer } from './ClipPlayer';
 
@@ -10,17 +10,24 @@ export class AudioEngine {
   readonly context: AudioContext;
   readonly masterBus: MasterBus;
   readonly transport: Transport;
-  readonly clock: AudioClock;
+  tempoMap: TempoMap;
   readonly metronome: Metronome;
   readonly clipPlayer: ClipPlayer;
 
   private constructor() {
     this.context = new AudioContext({ sampleRate: 48000 });
-    this.clock = new AudioClock(120, 4, 4);
+    this.tempoMap = new TempoMap();
     this.masterBus = new MasterBus(this.context);
-    this.metronome = new Metronome(this.context, this.clock, this.masterBus.input);
-    this.clipPlayer = new ClipPlayer(this.context, this.clock);
-    this.transport = new Transport(this.context, this.clock, this.metronome);
+    this.metronome = new Metronome(this.context, this.masterBus.input);
+    this.clipPlayer = new ClipPlayer(this.context, this.tempoMap);
+    this.transport = new Transport(this.context, this.tempoMap, this.metronome);
+  }
+
+  /** Replace the tempo map (e.g. when loading a project or syncing). */
+  setTempoMap(tempoMap: TempoMap): void {
+    this.tempoMap = tempoMap;
+    this.transport.setTempoMap(tempoMap);
+    this.clipPlayer.setTempoMap(tempoMap);
   }
 
   static getInstance(): AudioEngine {
