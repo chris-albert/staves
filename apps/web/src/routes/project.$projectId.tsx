@@ -30,6 +30,9 @@ export const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/project/$projectId',
   component: DawEditorPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    roomId: typeof search.roomId === 'string' ? search.roomId : undefined,
+  }),
 });
 
 function DawEditorPage() {
@@ -56,9 +59,11 @@ function DawEditorPage() {
   // Preferences window
   const [prefsOpen, setPrefsOpen] = useState(false);
 
-  // Sync / collaboration
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const { status: connectionStatus, peerCount, getProvider, getBlobTransfer } = useSync(roomId);
+  // Sync / collaboration — auto-connect if roomId is in the URL (join flow)
+  const { roomId: urlRoomId } = projectRoute.useSearch();
+  const [roomId, setRoomId] = useState<string | null>(urlRoomId ?? null);
+  const isJoining = !!urlRoomId;
+  const { status: connectionStatus, peerCount, getProvider, getBlobTransfer } = useSync(roomId, isJoining);
 
   // Audio devices
   const {
@@ -90,24 +95,45 @@ function DawEditorPage() {
     }
   }, [selectedOutputId]);
 
-  // Load project data from IndexedDB
+  // Load project data from IndexedDB.
+  // When joining via roomId, the local DB may not have this project yet —
+  // create a placeholder so the editor can render while Yjs syncs the real data.
   useEffect(() => {
+    const isJoining = !!roomId;
+
     async function load() {
       const p = await projectRepository.getProject(projectId);
-      if (!p) {
+      if (!p && !isJoining) {
         navigate({ to: '/' });
         return;
       }
-      setProject(p);
-      setBpm(p.bpm);
-      const loadedTracks = await projectRepository.getTracks(projectId);
-      setTracks(loadedTracks);
-      const loadedClips = await projectRepository.getClips(projectId);
-      setClips(loadedClips);
+
+      if (p) {
+        setProject(p);
+        setBpm(p.bpm);
+        const loadedTracks = await projectRepository.getTracks(projectId);
+        setTracks(loadedTracks);
+        const loadedClips = await projectRepository.getClips(projectId);
+        setClips(loadedClips);
+      } else {
+        // Joining a remote session — set a skeleton project so the UI renders.
+        // Yjs sync (via projectSync hydration) will replace this with the real data.
+        setProject({
+          id: projectId,
+          name: 'Joining...',
+          bpm: 120,
+          timeSignatureNumerator: 4,
+          timeSignatureDenominator: 4,
+          sampleRate: 48000,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        setBpm(120);
+      }
     }
     load();
     return () => reset();
-  }, [projectId, navigate, setProject, setTracks, setClips, setBpm, reset]);
+  }, [projectId, navigate, setProject, setTracks, setClips, setBpm, reset, roomId]);
 
   // --- Transport handlers ---
   const { play, stop } = useTransportHooks();
@@ -272,7 +298,7 @@ function DawEditorPage() {
         peerCount={peerCount}
         projectId={project.id}
         projectName={project.name}
-        onImported={(id) => navigate({ to: '/project/$projectId', params: { projectId: id } })}
+        onImported={(id) => navigate({ to: '/project/$projectId', params: { projectId: id }, search: { roomId: undefined } })}
       />
     </>
   );
