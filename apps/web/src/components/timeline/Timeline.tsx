@@ -109,7 +109,7 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col overflow-x-hidden overflow-y-auto bg-zinc-950"
+      className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto bg-zinc-950"
     >
       <TimelineRuler zoom={zoom} scrollLeft={scrollLeft} />
 
