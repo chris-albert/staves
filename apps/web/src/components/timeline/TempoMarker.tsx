@@ -31,10 +31,13 @@ export function TempoMarker({ event, x, onUpdate, onRemove }: TempoMarkerProps) 
     setEditing(false);
   };
 
+  // Clamp left so the centered marker never overflows past the left edge
+  const clampedX = Math.max(5, x);
+
   return (
     <div
       className="absolute flex flex-col items-center"
-      style={{ left: x, top: 0 }}
+      style={{ left: clampedX, top: 0 }}
     >
       {/* Diamond marker */}
       <button
