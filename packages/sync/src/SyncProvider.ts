@@ -20,7 +20,7 @@ export class SyncProvider {
     this.doc = new Y.Doc();
 
     const signalingServers = options.signalingServers ?? [
-      'wss://signaling.yjs.dev',
+      'wss://staves-signaling.chris-25c.workers.dev',
     ];
 
     this.provider = new WebrtcProvider(options.roomId, this.doc, {
