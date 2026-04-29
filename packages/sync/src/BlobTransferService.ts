@@ -110,22 +110,20 @@ export class BlobTransferService {
       const pc: RTCPeerConnection = conn.peer._pc;
       if (!pc) continue;
 
-      // Try to create a data channel (initiator side)
+      // Use a negotiated data channel so both sides create it independently.
+      // This avoids simple-peer's ondatachannel handler from hijacking our
+      // channel and routing Yjs sync messages through it.
       try {
-        const ch = pc.createDataChannel(CHANNEL_LABEL, { ordered: true });
+        const ch = pc.createDataChannel(CHANNEL_LABEL, {
+          ordered: true,
+          negotiated: true,
+          id: 100,
+        });
         ch.binaryType = 'arraybuffer';
         this.attachChannel(peerId, ch);
       } catch {
-        // Not the initiator — listen for the channel
+        // Channel already exists for this peer
       }
-
-      // Listen for incoming data channels (responder side)
-      pc.addEventListener('datachannel', (e) => {
-        if (e.channel.label === CHANNEL_LABEL) {
-          e.channel.binaryType = 'arraybuffer';
-          this.attachChannel(peerId, e.channel);
-        }
-      });
     }
   }
 
