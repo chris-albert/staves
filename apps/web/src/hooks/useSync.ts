@@ -25,8 +25,14 @@ export function useSync(roomId: string | null, isJoining = false) {
 
     setStatus('connecting');
 
+    const signalingEnv = import.meta.env.VITE_SIGNALING_SERVER;
+    const signalingServers = signalingEnv
+      ? signalingEnv.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
     const provider = new SyncProvider({
       roomId,
+      signalingServers,
       onPeerConnect: () => {
         setStatus('connected');
         setPeerCount(provider.peerCount);

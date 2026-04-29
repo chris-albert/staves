@@ -44,7 +44,9 @@ pnpm test
 
 ```
 staves/
-├── apps/web/              # React SPA (Vite + TanStack Router + Tailwind)
+├── apps/
+│   ├── web/               # React SPA (Vite + TanStack Router + Tailwind)
+│   └── signaling/         # Cloudflare Worker — y-webrtc signaling server
 ├── packages/
 │   ├── audio-engine/      # Web Audio API layer (transport, recording, playback)
 │   ├── storage/           # IndexedDB via Dexie (projects, tracks, clips, audio blobs)
@@ -53,3 +55,23 @@ staves/
 ├── turbo.json
 └── pnpm-workspace.yaml
 ```
+
+## Deployment
+
+- **Web** (`apps/web`) deploys to Cloudflare Pages on push to `main` via
+  `.github/workflows/deploy-web.yml`. Project name: `staves`.
+- **Signaling** (`apps/signaling`) deploys to a Cloudflare Worker on push to
+  `main` via `.github/workflows/deploy-signaling.yml`.
+
+Both workflows need these GitHub repository secrets:
+
+- `CLOUDFLARE_API_TOKEN` — token with `Workers Scripts:Edit` and
+  `Cloudflare Pages:Edit` permissions
+- `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
+
+And one repository variable (Settings → Variables):
+
+- `VITE_SIGNALING_SERVER` — the deployed signaling URL, e.g.
+  `wss://staves-signaling.<account-subdomain>.workers.dev`. Set this _after_
+  the first signaling deploy. Without it the web app falls back to the public
+  `wss://signaling.yjs.dev` server.
