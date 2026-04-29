@@ -69,9 +69,7 @@ Both workflows need these GitHub repository secrets:
   `Cloudflare Pages:Edit` permissions
 - `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
 
-And one repository variable (Settings → Variables):
-
-- `VITE_SIGNALING_SERVER` — the deployed signaling URL, e.g.
-  `wss://staves-signaling.<account-subdomain>.workers.dev`. Set this _after_
-  the first signaling deploy. Without it the web app falls back to the public
-  `wss://signaling.yjs.dev` server.
+The web app defaults to `wss://staves-signaling.chris-25c.workers.dev` (the
+deployed Worker). To point it elsewhere — e.g. a `wrangler dev` instance on
+`localhost:8787` — set `VITE_SIGNALING_SERVER` in `apps/web/.env.local` (or as
+a repo variable for CI builds).
