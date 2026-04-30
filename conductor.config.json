@@ -1,0 +1,17 @@
+{
+  "processes": [
+    {
+      "name": "dev",
+      "description": "Dev",
+      "command": "pnpm dev",
+      "slots": [
+        "WEB",
+        "SIGNAL"
+      ]
+    },
+    {
+      "name": "test",
+      "command": "pnpm test --watch"
+    }
+  ]
+}
