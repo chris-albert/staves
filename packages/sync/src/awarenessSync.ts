@@ -33,7 +33,9 @@ export const awarenessSync = {
 
   /** Update cursor beat position. */
   setCursorBeat(awareness: Awareness, beat: number | null): void {
-    awareness.setLocalStateField('cursorBeat', beat);
+    const user = awareness.getLocalState()?.['user'] as Omit<PeerState, 'clientId'> | undefined;
+    if (!user) return;
+    awareness.setLocalStateField('user', { ...user, cursorBeat: beat });
   },
 
   /** Update selection range. */
@@ -41,12 +43,16 @@ export const awarenessSync = {
     awareness: Awareness,
     selection: PeerState['selection'],
   ): void {
-    awareness.setLocalStateField('selection', selection);
+    const user = awareness.getLocalState()?.['user'] as Omit<PeerState, 'clientId'> | undefined;
+    if (!user) return;
+    awareness.setLocalStateField('user', { ...user, selection });
   },
 
   /** Update recording track indicator. */
   setRecordingTrack(awareness: Awareness, trackId: string | null): void {
-    awareness.setLocalStateField('recordingTrackId', trackId);
+    const user = awareness.getLocalState()?.['user'] as Omit<PeerState, 'clientId'> | undefined;
+    if (!user) return;
+    awareness.setLocalStateField('user', { ...user, recordingTrackId: trackId });
   },
 
   /** Get all remote peers' state. */

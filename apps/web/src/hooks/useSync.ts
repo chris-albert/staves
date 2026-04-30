@@ -105,6 +105,55 @@ export function useSync(roomId: string | null, isJoining = false) {
       );
     });
 
+    // Broadcast local cursor position (throttled to ~10Hz to avoid flooding)
+    let cursorRaf = 0;
+    let lastCursorBroadcast = 0;
+    const CURSOR_THROTTLE_MS = 100;
+    const unsubCursor = useTransportStore.subscribe((state) => {
+      const now = Date.now();
+      if (now - lastCursorBroadcast < CURSOR_THROTTLE_MS) return;
+      lastCursorBroadcast = now;
+      cancelAnimationFrame(cursorRaf);
+      cursorRaf = requestAnimationFrame(() => {
+        awarenessSync.setCursorBeat(
+          provider.awareness,
+          state.isPlaying ? state.currentBeat : null,
+        );
+      });
+    });
+
+    // Broadcast recording track indicator
+    const unsubRecordingTrack = useTransportStore.subscribe((state) => {
+      awarenessSync.setRecordingTrack(provider.awareness, state.recordingTrackId);
+    });
+
+    // Broadcast selection (map selected clips to beat range)
+    const unsubSelection = useUiStore.subscribe((state) => {
+      const { selectedClipIds, selectedTrackId } = state;
+      if (selectedClipIds.size === 0 || !selectedTrackId) {
+        awarenessSync.setSelection(provider.awareness, null);
+        return;
+      }
+      const clips = useProjectStore.getState().clips;
+      let minBeat = Infinity;
+      let maxBeat = -Infinity;
+      for (const clipId of selectedClipIds) {
+        const clip = clips.find((c) => c.id === clipId);
+        if (!clip) continue;
+        minBeat = Math.min(minBeat, clip.startBeat);
+        maxBeat = Math.max(maxBeat, clip.startBeat + clip.durationBeats);
+      }
+      if (minBeat === Infinity) {
+        awarenessSync.setSelection(provider.awareness, null);
+        return;
+      }
+      awarenessSync.setSelection(provider.awareness, {
+        startBeat: minBeat,
+        endBeat: maxBeat,
+        trackId: selectedTrackId,
+      });
+    });
+
     // Audio blob transfer service
     const blobTransfer = new BlobTransferService({
       provider: provider.provider,
@@ -150,9 +199,13 @@ export function useSync(roomId: string | null, isJoining = false) {
 
     return () => {
       clearTimeout(timer);
+      cancelAnimationFrame(cursorRaf);
       unsubProjectSync();
       unsubTransportSync();
       unsubAwareness();
+      unsubCursor();
+      unsubRecordingTrack();
+      unsubSelection();
       blobTransfer.destroy();
       blobTransferRef.current = null;
       provider.destroy();
