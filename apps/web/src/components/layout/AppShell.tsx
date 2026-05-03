@@ -10,13 +10,14 @@ interface AppShellProps {
   masterTrack: ReactNode;
   masterLane: ReactNode;
   timeline: ReactNode;
+  bottomPanel?: ReactNode;
   connectionStatus: ConnectionStatus;
   peerCount: number;
   roomId: string | null;
   onShareRoom: () => void;
 }
 
-export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, masterTrack, masterLane, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
+export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, masterTrack, masterLane, timeline, bottomPanel, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
   const trackListRef = useRef<HTMLDivElement>(null);
   const [, setScrollTop] = useState(0);
 
@@ -49,6 +50,12 @@ export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, ma
             {timeline}
           </div>
         </div>
+        {/* Bottom editor panel (step sequencer, etc.) */}
+        {bottomPanel && (
+          <div className="flex-shrink-0 border-t border-zinc-700">
+            {bottomPanel}
+          </div>
+        )}
         {/* Metronome row pinned above master */}
         <div className="flex flex-shrink-0">
           <div className="w-60 flex-shrink-0 border-r border-zinc-800/80">

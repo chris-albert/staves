@@ -27,6 +27,8 @@ export interface Project {
   timeSignatureEvents?: TimeSignatureEventData[];
 }
 
+export type TrackType = 'audio' | 'drum';
+
 export interface Track {
   id: string;
   projectId: string;
@@ -40,6 +42,7 @@ export interface Track {
   color: string;
   inputDeviceId: string; // '' = system default
   inputChannel: number; // -1 = all channels (stereo), 0 = ch 1, 1 = ch 2, etc.
+  type: TrackType;
 }
 
 export interface Clip {
@@ -54,6 +57,39 @@ export interface Clip {
   gainDb: number;
   /** Total duration of the source audio in beats (for non-destructive trim). */
   sourceDurationBeats: number;
+  /** References DrumPattern.id for drum clips. When set, audioBlobId is ''. */
+  drumPatternId?: string;
+}
+
+export interface DrumStep {
+  /** Which drum pad this step belongs to (index 0-11). */
+  padIndex: number;
+  /** Step position (0-based) within the pattern. */
+  step: number;
+  /** Velocity 0-1 (default 1). */
+  velocity: number;
+}
+
+export interface DrumPadConfig {
+  /** Index 0-11. */
+  index: number;
+  /** Display name (e.g. "Kick", "Snare"). */
+  name: string;
+  /** Sample URL relative to public/ (e.g. "/drums/kick.wav"). */
+  sampleUrl: string;
+}
+
+export interface DrumPattern {
+  id: string;
+  projectId: string;
+  /** Number of steps in the pattern (default 16). */
+  steps: number;
+  /** Step subdivision: how many steps per beat (default 4 = sixteenth notes). */
+  stepsPerBeat: number;
+  /** The active steps. Sparse — only "on" steps are stored. */
+  activeSteps: DrumStep[];
+  /** Pad configuration (12 pads). */
+  pads: DrumPadConfig[];
 }
 
 export interface AudioBlob {
@@ -78,6 +114,7 @@ const db = new Dexie('staves') as Dexie & {
   clips: EntityTable<Clip, 'id'>;
   audioBlobs: EntityTable<AudioBlob, 'id'>;
   waveformCache: EntityTable<WaveformCache, 'audioBlobId'>;
+  drumPatterns: EntityTable<DrumPattern, 'id'>;
 };
 
 db.version(1).stores({
@@ -156,6 +193,22 @@ db.version(5).stores({
     if (clip.sourceDurationBeats === undefined) {
       // For existing clips, the current offsetBeats + durationBeats represents the full source extent
       clip.sourceDurationBeats = clip.offsetBeats + clip.durationBeats;
+    }
+  });
+});
+
+// Add drum track support: Track.type, DrumPattern table
+db.version(6).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+  drumPatterns: 'id, projectId',
+}).upgrade((tx) => {
+  return tx.table('tracks').toCollection().modify((track) => {
+    if (track.type === undefined) {
+      track.type = 'audio';
     }
   });
 });

@@ -1,4 +1,4 @@
-import { db, type Project, type Track, type Clip } from './db';
+import { db, type Project, type Track, type Clip, type DrumPattern, type TrackType } from './db';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -47,12 +47,13 @@ export const projectRepository = {
   },
 
   async deleteProject(id: string): Promise<void> {
-    await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.waveformCache], async () => {
+    await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.waveformCache, db.drumPatterns], async () => {
       const clips = await db.clips.where('projectId').equals(id).toArray();
-      const audioBlobIds = [...new Set(clips.map((c) => c.audioBlobId))];
+      const audioBlobIds = [...new Set(clips.map((c) => c.audioBlobId).filter(Boolean))];
 
       await db.clips.where('projectId').equals(id).delete();
       await db.tracks.where('projectId').equals(id).delete();
+      await db.drumPatterns.where('projectId').equals(id).delete();
       await db.audioBlobs.where('projectId').equals(id).delete();
       for (const blobId of audioBlobIds) {
         await db.waveformCache.delete(blobId);
@@ -63,7 +64,7 @@ export const projectRepository = {
 
   // --- Tracks ---
 
-  async createTrack(projectId: string, name: string): Promise<Track> {
+  async createTrack(projectId: string, name: string, type: TrackType = 'audio'): Promise<Track> {
     const existing = await db.tracks.where('projectId').equals(projectId).count();
     const track: Track = {
       id: generateId(),
@@ -78,6 +79,7 @@ export const projectRepository = {
       color: TRACK_COLORS[existing % TRACK_COLORS.length]!,
       inputDeviceId: '',
       inputChannel: -1,
+      type,
     };
     await db.tracks.add(track);
     await db.projects.update(projectId, { updatedAt: Date.now() });
@@ -121,5 +123,29 @@ export const projectRepository = {
 
   async deleteClip(id: string): Promise<void> {
     await db.clips.delete(id);
+  },
+
+  // --- Drum Patterns ---
+
+  async createDrumPattern(pattern: Omit<DrumPattern, 'id'>): Promise<DrumPattern> {
+    const full: DrumPattern = { id: generateId(), ...pattern };
+    await db.drumPatterns.add(full);
+    return full;
+  },
+
+  async getDrumPatterns(projectId: string): Promise<DrumPattern[]> {
+    return db.drumPatterns.where('projectId').equals(projectId).toArray();
+  },
+
+  async getDrumPattern(id: string): Promise<DrumPattern | undefined> {
+    return db.drumPatterns.get(id);
+  },
+
+  async updateDrumPattern(id: string, changes: Partial<Omit<DrumPattern, 'id'>>): Promise<void> {
+    await db.drumPatterns.update(id, changes);
+  },
+
+  async deleteDrumPattern(id: string): Promise<void> {
+    await db.drumPatterns.delete(id);
   },
 };

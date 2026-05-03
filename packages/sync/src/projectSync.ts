@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
 import type { WebrtcProvider } from 'y-webrtc';
-import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData } from '@staves/storage';
+import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData, DrumPattern } from '@staves/storage';
 
 /** Fields on the Project object that are synced as separate Yjs arrays (not in the project map). */
 const ARRAY_SYNCED_KEYS = new Set(['tempoEvents', 'timeSignatureEvents']);
@@ -11,6 +11,7 @@ interface ProjectStoreState {
   clips: Clip[];
   tempoEvents: TempoEventData[];
   timeSignatureEvents: TimeSignatureEventData[];
+  drumPatterns: DrumPattern[];
 }
 
 interface ProjectStoreActions {
@@ -19,6 +20,7 @@ interface ProjectStoreActions {
   setClips: (c: Clip[]) => void;
   setTempoEvents: (e: TempoEventData[]) => void;
   setTimeSignatureEvents: (e: TimeSignatureEventData[]) => void;
+  setDrumPatterns: (p: DrumPattern[]) => void;
 }
 
 type ProjectStore = ProjectStoreState & ProjectStoreActions;
@@ -50,6 +52,7 @@ export function projectSync(
   const yClips = doc.getArray<Y.Map<unknown>>('clips');
   const yTempoEvents = doc.getArray<Y.Map<unknown>>('tempoEvents');
   const yTimeSignatureEvents = doc.getArray<Y.Map<unknown>>('timeSignatureEvents');
+  const yDrumPatterns = doc.getArray<Y.Map<unknown>>('drumPatterns');
 
   let isSyncing = false;
 
@@ -80,6 +83,10 @@ export function projectSync(
 
     if (yTimeSignatureEvents.length > 0) {
       getState().setTimeSignatureEvents(yTimeSignatureEvents.toArray().map((m) => m.toJSON() as unknown as TimeSignatureEventData));
+    }
+
+    if (yDrumPatterns.length > 0) {
+      getState().setDrumPatterns(yDrumPatterns.toArray().map((m) => m.toJSON() as unknown as DrumPattern));
     }
 
     storeToYjsEnabled = true;
@@ -135,6 +142,15 @@ export function projectSync(
     isSyncing = false;
   });
 
+  yDrumPatterns.observe(() => {
+    if (isSyncing) return;
+    isSyncing = true;
+    const patterns = yDrumPatterns.toArray().map((m) => m.toJSON() as unknown as DrumPattern);
+    getState().setDrumPatterns(patterns);
+    storeToYjsEnabled = true;
+    isSyncing = false;
+  });
+
   // --- Store → Yjs ---
 
   const unsubscribe = subscribe((state) => {
@@ -163,6 +179,9 @@ export function projectSync(
 
       // Sync time signature events
       syncArray(yTimeSignatureEvents, state.timeSignatureEvents as unknown as Record<string, unknown>[], 'id');
+
+      // Sync drum patterns
+      syncArray(yDrumPatterns, state.drumPatterns as unknown as Record<string, unknown>[], 'id');
     });
 
     isSyncing = false;
@@ -215,6 +234,7 @@ export function projectSync(
         syncArray(yClips, state.clips as unknown as Record<string, unknown>[], 'id');
         syncArray(yTempoEvents, state.tempoEvents as unknown as Record<string, unknown>[], 'id');
         syncArray(yTimeSignatureEvents, state.timeSignatureEvents as unknown as Record<string, unknown>[], 'id');
+        syncArray(yDrumPatterns, state.drumPatterns as unknown as Record<string, unknown>[], 'id');
       });
       isSyncing = false;
     }

@@ -3,4 +3,4 @@ export { projectRepository } from './projectRepository';
 export { audioBlobStore } from './audioBlobStore';
 export { exportProject } from './exportProject';
 export { importProject } from './importProject';
-export type { Project, Track, Clip, AudioBlob, WaveformCache, TempoEventData, TimeSignatureEventData } from './db';
+export type { Project, Track, TrackType, Clip, AudioBlob, WaveformCache, TempoEventData, TimeSignatureEventData, DrumPattern, DrumStep, DrumPadConfig } from './db';

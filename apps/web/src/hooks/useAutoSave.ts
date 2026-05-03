@@ -20,13 +20,14 @@ export function useAutoSave() {
       const clipsChanged = state.clips !== prev.clips;
       const tempoChanged = state.tempoEvents !== prev.tempoEvents;
       const timeSigChanged = state.timeSignatureEvents !== prev.timeSignatureEvents;
+      const drumPatternsChanged = state.drumPatterns !== prev.drumPatterns;
 
-      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged) return;
+      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged && !drumPatternsChanged) return;
 
       if (timerRef.current) clearTimeout(timerRef.current);
 
       timerRef.current = setTimeout(async () => {
-        const { project, tracks, clips, tempoEvents, timeSignatureEvents } = useProjectStore.getState();
+        const { project, tracks, clips, tempoEvents, timeSignatureEvents, drumPatterns } = useProjectStore.getState();
         if (!project) return;
 
         try {
@@ -60,6 +61,15 @@ export function useAutoSave() {
               offsetBeats: clip.offsetBeats,
               gainDb: clip.gainDb,
               name: clip.name,
+            });
+          }
+
+          for (const pattern of drumPatterns) {
+            await projectRepository.updateDrumPattern(pattern.id, {
+              steps: pattern.steps,
+              stepsPerBeat: pattern.stepsPerBeat,
+              activeSteps: pattern.activeSteps,
+              pads: pattern.pads,
             });
           }
         } catch (e) {

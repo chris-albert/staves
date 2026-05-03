@@ -1,6 +1,9 @@
 export { AudioEngine } from './AudioEngine';
 export { Transport } from './Transport';
-export type { ScheduledClip, ScheduleWindow } from './Transport';
+export type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit, ScheduleWindow } from './Transport';
+export { DrumSampler } from './DrumSampler';
+export { DEFAULT_DRUM_KIT } from './DrumKit';
+export type { DrumKitSound } from './DrumKit';
 export { TrackNode } from './TrackNode';
 export { MasterBus } from './MasterBus';
 export { ClipPlayer } from './ClipPlayer';
