@@ -61,7 +61,7 @@ export function MasterTrack({ outputs, selectedOutputId, onSelectOutput }: Maste
           {/* Row 1: label + output selector */}
           <div className="flex items-center gap-1.5">
             <span className="flex-1 truncate text-[13px] font-medium text-zinc-300">
-              Master
+              Main
             </span>
             <DeviceSelect
               devices={outputs}
