@@ -25,13 +25,15 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
   const isSelected = selectedClipIds.has(clip.id);
 
   const dragRef = useRef<{
-    type: 'move' | 'trim-left' | 'trim-right';
+    type: 'move' | 'trim-left' | 'trim-right' | 'fade-in' | 'fade-out';
     startX: number;
     startY: number;
     origStartBeat: number;
     origDurationBeats: number;
     origOffsetBeats: number;
     origTrackId: string;
+    origFadeInBeats?: number;
+    origFadeOutBeats?: number;
   } | null>(null);
 
   const left = clip.startBeat * zoom - scrollLeft;
@@ -43,7 +45,7 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
   );
 
   const onPointerDown = useCallback(
-    (e: ReactPointerEvent, type: 'move' | 'trim-left' | 'trim-right' = 'move') => {
+    (e: ReactPointerEvent, type: 'move' | 'trim-left' | 'trim-right' | 'fade-in' | 'fade-out' = 'move') => {
       e.stopPropagation();
       // Cmd/Ctrl+click: seek playhead to clip start
       if (e.metaKey || e.ctrlKey) {
@@ -59,10 +61,12 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
         origDurationBeats: clip.durationBeats,
         origOffsetBeats: clip.offsetBeats,
         origTrackId: clip.trackId,
+        origFadeInBeats: clip.fadeInBeats,
+        origFadeOutBeats: clip.fadeOutBeats,
       };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [clip.id, clip.startBeat, clip.durationBeats, clip.offsetBeats, clip.trackId, selectClip, seek],
+    [clip.id, clip.startBeat, clip.durationBeats, clip.offsetBeats, clip.trackId, clip.fadeInBeats, clip.fadeOutBeats, selectClip, seek],
   );
 
   const onPointerMove = useCallback(
@@ -103,9 +107,17 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
         const maxDuration = clip.sourceDurationBeats - d.origOffsetBeats;
         const newDuration = snap(Math.min(maxDuration, Math.max(0.25, d.origDurationBeats + dBeats)));
         updateClip(clip.id, { durationBeats: newDuration });
+      } else if (d.type === 'fade-in') {
+        const fadeDBeats = (e.clientX - d.startX) / zoom;
+        const newFadeIn = Math.max(0, Math.min(clip.durationBeats * 0.5, (d.origFadeInBeats ?? 0) + fadeDBeats));
+        updateClip(clip.id, { fadeInBeats: newFadeIn });
+      } else if (d.type === 'fade-out') {
+        const fadeDBeats = (d.startX - e.clientX) / zoom;
+        const newFadeOut = Math.max(0, Math.min(clip.durationBeats * 0.5, (d.origFadeOutBeats ?? 0) + fadeDBeats));
+        updateClip(clip.id, { fadeOutBeats: newFadeOut });
       }
     },
-    [clip.id, clip.sourceDurationBeats, zoom, snap, updateClip, tracks, laneHeight],
+    [clip.id, clip.durationBeats, clip.sourceDurationBeats, zoom, snap, updateClip, tracks, laneHeight],
   );
 
   const onPointerUp = useCallback(() => {
@@ -128,6 +140,12 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
       onPointerDown={(e) => onPointerDown(e, 'move')}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectClip(clip.id, false);
+        useUiStore.getState().setContextMenu({ x: e.clientX, y: e.clientY, clipId: clip.id });
+      }}
     >
       {/* Left trim handle */}
       <div
@@ -140,6 +158,82 @@ export function ClipView({ clip, color, zoom, scrollLeft, laneHeight }: ClipView
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize opacity-0 group-hover:opacity-100 hover:bg-white/20 transition-opacity z-10"
         onPointerDown={(e) => onPointerDown(e, 'trim-right')}
       />
+
+      {/* Fade-in region */}
+      {clip.fadeInBeats > 0 && (
+        <div
+          className="absolute top-0 bottom-0 left-0 pointer-events-none"
+          style={{ width: clip.fadeInBeats / clip.durationBeats * 100 + '%' }}
+        >
+          <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1 1">
+            <polygon points="0,1 1,0 1,1" fill="black" opacity="0.3" />
+          </svg>
+        </div>
+      )}
+
+      {/* Fade-out region */}
+      {clip.fadeOutBeats > 0 && (
+        <div
+          className="absolute top-0 bottom-0 right-0 pointer-events-none"
+          style={{ width: clip.fadeOutBeats / clip.durationBeats * 100 + '%' }}
+        >
+          <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1 1">
+            <polygon points="0,0 0,1 1,1" fill="black" opacity="0.3" />
+          </svg>
+        </div>
+      )}
+
+      {/* Fade-in handle */}
+      <div
+        className="absolute top-0 z-20 h-3 w-3 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ left: Math.max(0, (clip.fadeInBeats / clip.durationBeats) * width - 6) }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          dragRef.current = {
+            type: 'fade-in',
+            startX: e.clientX,
+            startY: e.clientY,
+            origStartBeat: clip.startBeat,
+            origDurationBeats: clip.durationBeats,
+            origOffsetBeats: clip.offsetBeats,
+            origTrackId: clip.trackId,
+            origFadeInBeats: clip.fadeInBeats,
+          };
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" className="text-white/60">
+          <polygon points="0,12 12,0 12,12" fill="currentColor" />
+        </svg>
+      </div>
+
+      {/* Fade-out handle */}
+      <div
+        className="absolute top-0 z-20 h-3 w-3 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ right: Math.max(0, (clip.fadeOutBeats / clip.durationBeats) * width - 6) }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          dragRef.current = {
+            type: 'fade-out',
+            startX: e.clientX,
+            startY: e.clientY,
+            origStartBeat: clip.startBeat,
+            origDurationBeats: clip.durationBeats,
+            origOffsetBeats: clip.offsetBeats,
+            origTrackId: clip.trackId,
+            origFadeOutBeats: clip.fadeOutBeats,
+          };
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" className="text-white/60">
+          <polygon points="0,0 0,12 12,12" fill="currentColor" />
+        </svg>
+      </div>
 
       <div className="truncate px-2 text-[10px] text-zinc-300">{clip.name}</div>
       <WaveformCanvas

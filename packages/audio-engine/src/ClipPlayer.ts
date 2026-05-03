@@ -43,16 +43,32 @@ export class ClipPlayer {
     source.buffer = clip.buffer;
 
     const gain = this.context.createGain();
-    gain.gain.value = Math.pow(10, clip.gainDb / 20);
-
-    source.connect(gain);
-    gain.connect(destination);
+    const clipGainValue = Math.pow(10, clip.gainDb / 20);
 
     // Audio buffers don't time-stretch — use the tempo at the clip's
     // start position to convert beat-based offset/duration to seconds.
     const tempoAtClip = this.tempoMap.tempoAtBeat(clip.startBeat);
     const offsetSeconds = clip.offsetBeats * 60 / tempoAtClip;
     const durationSeconds = clip.durationBeats * 60 / tempoAtClip;
+    const fadeInSeconds = clip.fadeInBeats * 60 / tempoAtClip;
+    const fadeOutSeconds = clip.fadeOutBeats * 60 / tempoAtClip;
+
+    // Apply fade envelope
+    if (fadeInSeconds > 0) {
+      gain.gain.setValueAtTime(0, contextStartTime);
+      gain.gain.linearRampToValueAtTime(clipGainValue, contextStartTime + fadeInSeconds);
+    } else {
+      gain.gain.setValueAtTime(clipGainValue, contextStartTime);
+    }
+
+    if (fadeOutSeconds > 0) {
+      const fadeOutStart = contextStartTime + durationSeconds - fadeOutSeconds;
+      gain.gain.setValueAtTime(clipGainValue, Math.max(contextStartTime, fadeOutStart));
+      gain.gain.linearRampToValueAtTime(0, contextStartTime + durationSeconds);
+    }
+
+    source.connect(gain);
+    gain.connect(destination);
 
     source.start(contextStartTime, offsetSeconds, durationSeconds);
     this.activeNodes.set(clip.clipId, source);

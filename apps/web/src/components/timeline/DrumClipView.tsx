@@ -165,6 +165,12 @@ export function DrumClipView({ clip, pattern, color, zoom, scrollLeft, laneHeigh
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onDoubleClick={onDoubleClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectClip(clip.id, false);
+        useUiStore.getState().setContextMenu({ x: e.clientX, y: e.clientY, clipId: clip.id });
+      }}
     >
       {/* Left trim handle */}
       <div

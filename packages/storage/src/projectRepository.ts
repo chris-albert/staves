@@ -1,4 +1,4 @@
-import { db, type Project, type Track, type Clip, type DrumPattern, type TrackType } from './db';
+import { db, type Project, type Track, type Clip, type DrumPattern, type TrackType, type Marker } from './db';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -47,13 +47,14 @@ export const projectRepository = {
   },
 
   async deleteProject(id: string): Promise<void> {
-    await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.waveformCache, db.drumPatterns], async () => {
+    await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.waveformCache, db.drumPatterns, db.markers], async () => {
       const clips = await db.clips.where('projectId').equals(id).toArray();
       const audioBlobIds = [...new Set(clips.map((c) => c.audioBlobId).filter(Boolean))];
 
       await db.clips.where('projectId').equals(id).delete();
       await db.tracks.where('projectId').equals(id).delete();
       await db.drumPatterns.where('projectId').equals(id).delete();
+      await db.markers.where('projectId').equals(id).delete();
       await db.audioBlobs.where('projectId').equals(id).delete();
       for (const blobId of audioBlobIds) {
         await db.waveformCache.delete(blobId);
@@ -147,5 +148,25 @@ export const projectRepository = {
 
   async deleteDrumPattern(id: string): Promise<void> {
     await db.drumPatterns.delete(id);
+  },
+
+  // --- Markers ---
+
+  async createMarker(marker: Omit<Marker, 'id'>): Promise<Marker> {
+    const full: Marker = { id: generateId(), ...marker };
+    await db.markers.add(full);
+    return full;
+  },
+
+  async getMarkers(projectId: string): Promise<Marker[]> {
+    return db.markers.where('projectId').equals(projectId).sortBy('beat');
+  },
+
+  async updateMarker(id: string, changes: Partial<Omit<Marker, 'id'>>): Promise<void> {
+    await db.markers.update(id, changes);
+  },
+
+  async deleteMarker(id: string): Promise<void> {
+    await db.markers.delete(id);
   },
 };

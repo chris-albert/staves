@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData, DrumPattern } from '@staves/storage';
+import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData, DrumPattern, Marker } from '@staves/storage';
 
 interface ProjectState {
   project: Project | null;
@@ -8,6 +8,7 @@ interface ProjectState {
   tempoEvents: TempoEventData[];
   timeSignatureEvents: TimeSignatureEventData[];
   drumPatterns: DrumPattern[];
+  markers: Marker[];
 }
 
 interface ProjectActions {
@@ -33,6 +34,10 @@ interface ProjectActions {
   addDrumPattern: (pattern: DrumPattern) => void;
   updateDrumPattern: (id: string, changes: Partial<DrumPattern>) => void;
   removeDrumPattern: (id: string) => void;
+  setMarkers: (markers: Marker[]) => void;
+  addMarker: (marker: Marker) => void;
+  updateMarker: (id: string, changes: Partial<Marker>) => void;
+  removeMarker: (id: string) => void;
   reset: () => void;
 }
 
@@ -50,6 +55,7 @@ const initialState: ProjectState = {
   tempoEvents: defaultTempoEvents,
   timeSignatureEvents: defaultTimeSigEvents,
   drumPatterns: [],
+  markers: [],
 };
 
 export const useProjectStore = create<ProjectState & ProjectActions>()((set) => ({
@@ -148,6 +154,19 @@ export const useProjectStore = create<ProjectState & ProjectActions>()((set) => 
 
   removeDrumPattern: (id) =>
     set((s) => ({ drumPatterns: s.drumPatterns.filter((p) => p.id !== id) })),
+
+  // Markers
+  setMarkers: (markers) => set({ markers }),
+
+  addMarker: (marker) => set((s) => ({ markers: [...s.markers, marker] })),
+
+  updateMarker: (id, changes) =>
+    set((s) => ({
+      markers: s.markers.map((m) => (m.id === id ? { ...m, ...changes } : m)),
+    })),
+
+  removeMarker: (id) =>
+    set((s) => ({ markers: s.markers.filter((m) => m.id !== id) })),
 
   reset: () => set(initialState),
 }));
