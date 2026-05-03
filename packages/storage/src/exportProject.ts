@@ -9,14 +9,16 @@ export async function exportProject(projectId: string): Promise<Blob> {
   const tracks = await db.tracks.where('projectId').equals(projectId).toArray();
   const clips = await db.clips.where('projectId').equals(projectId).toArray();
   const audioBlobs = await db.audioBlobs.where('projectId').equals(projectId).toArray();
+  const drumPatterns = await db.drumPatterns.where('projectId').equals(projectId).toArray();
 
   // Build manifest (everything except binary audio data)
   const manifest = {
-    version: 1,
+    version: 2,
     project,
     tracks,
     clips,
     audioBlobs: audioBlobs.map(({ data: _, ...rest }) => rest),
+    drumPatterns,
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -16,11 +16,13 @@ import { RecordingRegion } from './RecordingRegion';
 interface TimelineProps {
   onScrollTop?: (px: number) => void;
   scrollTopExternal?: number;
+  onCreateDrumClip?: (trackId: string, startBeat: number) => void;
 }
 
-export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
+export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip }: TimelineProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const clips = useProjectStore((s) => s.clips);
+  const drumPatterns = useProjectStore((s) => s.drumPatterns);
   const zoom = useUiStore((s) => s.zoom);
   const scrollLeft = useUiStore((s) => s.scrollLeft);
   const setZoom = useUiStore((s) => s.setZoom);
@@ -100,6 +102,30 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
     [deselectAll, zoom, scrollLeft, seek, snapEnabled, snapDivision],
   );
 
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onCreateDrumClip) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-clip]')) return;
+      if (!trackAreaRef.current) return;
+
+      const rect = trackAreaRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left + scrollLeft;
+      const y = e.clientY - rect.top;
+
+      const trackIndex = Math.floor(y / 80);
+      if (trackIndex < 0 || trackIndex >= tracks.length) return;
+
+      const track = tracks[trackIndex];
+      if (!track || track.type !== 'drum') return;
+
+      const beat = Math.max(0, x / zoom);
+      const snappedBeat = snapEnabled ? snapToGrid(beat, snapDivision) : Math.floor(beat);
+      onCreateDrumClip(track.id, snappedBeat);
+    },
+    [onCreateDrumClip, scrollLeft, zoom, tracks, snapEnabled, snapDivision],
+  );
+
   const trackHeight = 80;
   const rulerHeight = 24;
   const trackContentHeight = tracks.length * trackHeight;
@@ -118,6 +144,7 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
         className="relative"
         style={{ width: '100%', minHeight: trackAreaMinHeight }}
         onClick={handleBackgroundClick}
+        onDoubleClick={handleDoubleClick}
       >
         <TimelineGrid zoom={zoom} scrollLeft={scrollLeft} />
 
@@ -128,6 +155,7 @@ export function Timeline({ onScrollTop, scrollTopExternal }: TimelineProps) {
               key={track.id}
               track={track}
               clips={trackClips}
+              drumPatterns={drumPatterns}
               zoom={zoom}
               scrollLeft={scrollLeft}
               top={i * trackHeight}

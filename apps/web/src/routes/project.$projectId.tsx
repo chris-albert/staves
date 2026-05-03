@@ -1,6 +1,6 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useCallback, useState, useMemo } from 'react';
-import { AudioEngine } from '@staves/audio-engine';
+import { AudioEngine, DEFAULT_DRUM_KIT } from '@staves/audio-engine';
 import { projectRepository } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTransportStore } from '@/stores/transportStore';
@@ -24,6 +24,7 @@ import { Timeline } from '@/components/timeline/Timeline';
 import { MetronomeLane } from '@/components/timeline/MetronomeLane';
 import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
+import { StepSequencer } from '@/components/sequencer/StepSequencer';
 import { rootRoute } from './__root';
 
 export const projectRoute = createRoute({
@@ -47,6 +48,9 @@ function DawEditorPage() {
   const removeClip = useProjectStore((s) => s.removeClip);
   const tracks = useProjectStore((s) => s.tracks);
   const clips = useProjectStore((s) => s.clips);
+  const drumPatterns = useProjectStore((s) => s.drumPatterns);
+  const setDrumPatterns = useProjectStore((s) => s.setDrumPatterns);
+  const addDrumPattern = useProjectStore((s) => s.addDrumPattern);
   const reset = useProjectStore((s) => s.reset);
   const setBpm = useTransportStore((s) => s.setBpm);
   const isPlaying = useTransportStore((s) => s.isPlaying);
@@ -55,6 +59,7 @@ function DawEditorPage() {
   const selectClip = useUiStore((s) => s.selectClip);
   const zoom = useUiStore((s) => s.zoom);
   const setZoom = useUiStore((s) => s.setZoom);
+  const editingDrumClipId = useUiStore((s) => s.editingDrumClipId);
 
   // Preferences window
   const [prefsOpen, setPrefsOpen] = useState(false);
@@ -115,6 +120,8 @@ function DawEditorPage() {
         setTracks(loadedTracks);
         const loadedClips = await projectRepository.getClips(projectId);
         setClips(loadedClips);
+        const loadedPatterns = await projectRepository.getDrumPatterns(projectId);
+        setDrumPatterns(loadedPatterns);
       } else {
         // Joining a remote session — set a skeleton project so the UI renders.
         // Yjs sync (via projectSync hydration) will replace this with the real data.
@@ -133,7 +140,7 @@ function DawEditorPage() {
     }
     load();
     return () => reset();
-  }, [projectId, navigate, setProject, setTracks, setClips, setBpm, reset, roomId]);
+  }, [projectId, navigate, setProject, setTracks, setClips, setDrumPatterns, setBpm, reset, roomId]);
 
   // --- Transport handlers ---
   const { play, stop } = useTransportHooks();
@@ -188,6 +195,83 @@ function DawEditorPage() {
     const track = await projectRepository.createTrack(project.id, `Track ${currentTracks.length + 1}`);
     addTrack(track);
   }, [project, addTrack]);
+
+  const handleAddDrumTrack = useCallback(async () => {
+    if (!project) return;
+    const currentTracks = useProjectStore.getState().tracks;
+    const track = await projectRepository.createTrack(
+      project.id,
+      `Drums ${currentTracks.filter((t) => t.type === 'drum').length + 1}`,
+      'drum',
+    );
+    addTrack(track);
+
+    // Create a default 16-step drum pattern
+    const pads = DEFAULT_DRUM_KIT.map((sound, i) => ({
+      index: i,
+      name: sound.name,
+      sampleUrl: sound.url,
+    }));
+    const pattern = await projectRepository.createDrumPattern({
+      projectId: project.id,
+      steps: 16,
+      stepsPerBeat: 4,
+      activeSteps: [],
+      pads,
+    });
+    addDrumPattern(pattern);
+
+    // Create a clip at beat 0 referencing this pattern
+    const durationBeats = 16 / 4; // 16 steps / 4 steps-per-beat = 4 beats
+    const clip = await projectRepository.createClip({
+      trackId: track.id,
+      projectId: project.id,
+      audioBlobId: '',
+      name: 'Pattern 1',
+      startBeat: 0,
+      durationBeats,
+      offsetBeats: 0,
+      gainDb: 0,
+      sourceDurationBeats: durationBeats,
+      drumPatternId: pattern.id,
+    });
+    addClip(clip);
+  }, [project, addTrack, addDrumPattern, addClip]);
+
+  // --- Create drum clip on timeline double-click ---
+  const handleCreateDrumClip = useCallback(async (trackId: string, startBeat: number) => {
+    if (!project) return;
+    const pads = DEFAULT_DRUM_KIT.map((sound, i) => ({
+      index: i,
+      name: sound.name,
+      sampleUrl: sound.url,
+    }));
+    const pattern = await projectRepository.createDrumPattern({
+      projectId: project.id,
+      steps: 16,
+      stepsPerBeat: 4,
+      activeSteps: [],
+      pads,
+    });
+    addDrumPattern(pattern);
+
+    const durationBeats = 16 / 4;
+    const currentClips = useProjectStore.getState().clips;
+    const trackClipCount = currentClips.filter((c) => c.trackId === trackId && c.drumPatternId).length;
+    const clip = await projectRepository.createClip({
+      trackId,
+      projectId: project.id,
+      audioBlobId: '',
+      name: `Pattern ${trackClipCount + 1}`,
+      startBeat,
+      durationBeats,
+      offsetBeats: 0,
+      gainDb: 0,
+      sourceDurationBeats: durationBeats,
+      drumPatternId: pattern.id,
+    });
+    addClip(clip);
+  }, [project, addDrumPattern, addClip]);
 
   // --- Clip deletion ---
   const handleDeleteSelected = useCallback(() => {
@@ -267,12 +351,21 @@ function DawEditorPage() {
             onNavigateHome={() => navigate({ to: '/' })}
           />
         }
-        trackList={<TrackList onAddTrack={handleAddTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
+        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
         metronomeTrack={<MetronomeTrack />}
         metronomeLane={<MetronomeLane />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         masterLane={<MasterLane />}
-        timeline={<Timeline />}
+        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} />}
+        bottomPanel={(() => {
+          if (!editingDrumClipId) return undefined;
+          const editClip = clips.find((c) => c.id === editingDrumClipId);
+          const editPattern = editClip?.drumPatternId
+            ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
+            : undefined;
+          if (!editClip || !editPattern) return undefined;
+          return <StepSequencer clip={editClip} pattern={editPattern} />;
+        })()}
         connectionStatus={connectionStatus}
         peerCount={peerCount}
         roomId={roomId}

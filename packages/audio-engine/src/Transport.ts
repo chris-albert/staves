@@ -13,8 +13,27 @@ export interface ScheduledClip {
   gainDb: number;
 }
 
+export interface ScheduledDrumHit {
+  /** Absolute beat position on the timeline. */
+  beat: number;
+  /** Sample key (URL) for DrumSampler lookup. */
+  sampleKey: string;
+  /** Velocity 0-1. */
+  velocity: number;
+}
+
+export interface ScheduledDrumClip {
+  clipId: string;
+  trackId: string;
+  startBeat: number;
+  durationBeats: number;
+  /** Pre-expanded list of all hits positioned in absolute timeline beats. */
+  hits: ScheduledDrumHit[];
+}
+
 export interface ScheduleWindow {
   clips: ScheduledClip[];
+  drumClips: ScheduledDrumClip[];
   fromBeat: number;
   toBeat: number;
   /** Converts a beat position to an absolute AudioContext time for scheduling. */
@@ -42,6 +61,7 @@ export class Transport {
   private timerId: ReturnType<typeof setTimeout> | null = null;
   private clipScheduler: ClipScheduler | null = null;
   private clips: ScheduledClip[] = [];
+  private drumClips: ScheduledDrumClip[] = [];
 
   // Look-ahead config
   private readonly scheduleAheadTime = 0.1; // seconds
@@ -116,6 +136,10 @@ export class Transport {
     this.clips = clips;
   }
 
+  setDrumClips(clips: ScheduledDrumClip[]): void {
+    this.drumClips = clips;
+  }
+
   play(): void {
     if (this.state !== 'stopped') return;
     this._playOrigin = this.startBeatOffset;
@@ -184,6 +208,7 @@ export class Transport {
       if (this.clipScheduler) {
         this.clipScheduler({
           clips: this.clips,
+          drumClips: this.drumClips,
           fromBeat: windowStartBeat,
           toBeat: windowEndBeat,
           beatToContextTime: beatToCtxTime,

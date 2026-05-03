@@ -22,6 +22,7 @@ interface UiState {
   peerCursors: PeerCursor[];
   snapEnabled: boolean;
   snapDivision: number; // beats (e.g. 1 = snap to beat, 0.25 = snap to 16th)
+  editingDrumClipId: string | null;
 }
 
 interface UiActions {
@@ -35,6 +36,7 @@ interface UiActions {
   setPeerCursors: (cursors: PeerCursor[]) => void;
   setSnapEnabled: (enabled: boolean) => void;
   setSnapDivision: (division: number) => void;
+  setEditingDrumClipId: (id: string | null) => void;
 }
 
 export const useUiStore = create<UiState & UiActions>()((set) => ({
@@ -47,6 +49,7 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   peerCursors: [],
   snapEnabled: true,
   snapDivision: 1,
+  editingDrumClipId: null,
 
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(200, zoom)) }),
   setScrollLeft: (scrollLeft) => set({ scrollLeft: Math.max(0, scrollLeft) }),
@@ -69,4 +72,5 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   setPeerCursors: (peerCursors) => set({ peerCursors }),
   setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
   setSnapDivision: (snapDivision) => set({ snapDivision }),
+  setEditingDrumClipId: (editingDrumClipId) => set({ editingDrumClipId }),
 }));

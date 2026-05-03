@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData } from '@staves/storage';
+import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData, DrumPattern } from '@staves/storage';
 
 interface ProjectState {
   project: Project | null;
@@ -7,6 +7,7 @@ interface ProjectState {
   clips: Clip[];
   tempoEvents: TempoEventData[];
   timeSignatureEvents: TimeSignatureEventData[];
+  drumPatterns: DrumPattern[];
 }
 
 interface ProjectActions {
@@ -28,6 +29,10 @@ interface ProjectActions {
   addTimeSignatureEvent: (event: TimeSignatureEventData) => void;
   updateTimeSignatureEvent: (id: string, changes: Partial<TimeSignatureEventData>) => void;
   removeTimeSignatureEvent: (id: string) => void;
+  setDrumPatterns: (patterns: DrumPattern[]) => void;
+  addDrumPattern: (pattern: DrumPattern) => void;
+  updateDrumPattern: (id: string, changes: Partial<DrumPattern>) => void;
+  removeDrumPattern: (id: string) => void;
   reset: () => void;
 }
 
@@ -44,6 +49,7 @@ const initialState: ProjectState = {
   clips: [],
   tempoEvents: defaultTempoEvents,
   timeSignatureEvents: defaultTimeSigEvents,
+  drumPatterns: [],
 };
 
 export const useProjectStore = create<ProjectState & ProjectActions>()((set) => ({
@@ -128,6 +134,20 @@ export const useProjectStore = create<ProjectState & ProjectActions>()((set) => 
       if (sorted[0]!.beat !== 0) return s;
       return { timeSignatureEvents: filtered };
     }),
+
+  // Drum patterns
+  setDrumPatterns: (drumPatterns) => set({ drumPatterns }),
+
+  addDrumPattern: (pattern) =>
+    set((s) => ({ drumPatterns: [...s.drumPatterns, pattern] })),
+
+  updateDrumPattern: (id, changes) =>
+    set((s) => ({
+      drumPatterns: s.drumPatterns.map((p) => (p.id === id ? { ...p, ...changes } : p)),
+    })),
+
+  removeDrumPattern: (id) =>
+    set((s) => ({ drumPatterns: s.drumPatterns.filter((p) => p.id !== id) })),
 
   reset: () => set(initialState),
 }));
