@@ -200,6 +200,8 @@ export function useEngineSync() {
           durationBeats: clip.durationBeats,
           offsetBeats: clip.offsetBeats,
           gainDb: clip.gainDb,
+          fadeInBeats: clip.fadeInBeats ?? 0,
+          fadeOutBeats: clip.fadeOutBeats ?? 0,
         });
       }
       engine.transport.setClips(scheduled);

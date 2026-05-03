@@ -19,6 +19,10 @@ interface DrumTrackHeaderProps {
 export function DrumTrackHeader({ track, stereoLevel }: DrumTrackHeaderProps) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
   const removeTrack = useProjectStore((s) => s.removeTrack);
+  const tracks = useProjectStore((s) => s.tracks);
+
+  const anySoloed = tracks.some((t) => t.isSolo);
+  const effectivelyMuted = anySoloed && !track.isSolo;
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(track.name);
@@ -80,6 +84,7 @@ export function DrumTrackHeader({ track, stereoLevel }: DrumTrackHeaderProps) {
   return (
     <div
       className="group flex h-20 items-stretch border-b border-zinc-800/80 transition-colors hover:bg-zinc-900/50"
+      style={{ opacity: effectivelyMuted ? 0.45 : 1, transition: 'opacity 0.15s ease' }}
     >
       {/* Color bar */}
       <button

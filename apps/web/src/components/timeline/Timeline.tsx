@@ -12,14 +12,16 @@ import { Playhead } from './Playhead';
 import { LoopRegion } from './LoopRegion';
 import { PeerCursors } from './PeerCursors';
 import { RecordingRegion } from './RecordingRegion';
+import { MarkerTrack } from './MarkerTrack';
 
 interface TimelineProps {
   onScrollTop?: (px: number) => void;
   scrollTopExternal?: number;
   onCreateDrumClip?: (trackId: string, startBeat: number) => void;
+  onDropAudioFile?: (trackId: string, startBeat: number, file: File) => void;
 }
 
-export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip }: TimelineProps) {
+export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onDropAudioFile }: TimelineProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const clips = useProjectStore((s) => s.clips);
   const drumPatterns = useProjectStore((s) => s.drumPatterns);
@@ -35,6 +37,7 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip }: T
   const containerRef = useRef<HTMLDivElement>(null);
   const trackAreaRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
 
   // Track container size so the track area fills the visible space
   useEffect(() => {
@@ -126,6 +129,48 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip }: T
     [onCreateDrumClip, scrollLeft, zoom, tracks, snapEnabled, snapDivision],
   );
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+      setDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    if (!onDropAudioFile || !trackAreaRef.current) return;
+
+    const files = Array.from(e.dataTransfer.files).filter(f =>
+      /\.(wav|mp3|ogg|m4a|flac|webm|aac)$/i.test(f.name)
+    );
+    if (files.length === 0) return;
+
+    const rect = trackAreaRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollLeft;
+    const y = e.clientY - rect.top;
+
+    const trackIndex = Math.floor(y / 80);
+    if (trackIndex < 0 || trackIndex >= tracks.length) return;
+    const track = tracks[trackIndex];
+    if (!track || track.type !== 'audio') return;
+
+    const beat = Math.max(0, x / zoom);
+    const snappedBeat = snapEnabled ? snapToGrid(beat, snapDivision) : beat;
+
+    for (const file of files) {
+      onDropAudioFile(track.id, snappedBeat, file);
+    }
+  }, [onDropAudioFile, scrollLeft, zoom, tracks, snapEnabled, snapDivision]);
+
   const trackHeight = 80;
   const rulerHeight = 24;
   const trackContentHeight = tracks.length * trackHeight;
@@ -145,6 +190,9 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip }: T
         style={{ width: '100%', minHeight: trackAreaMinHeight }}
         onClick={handleBackgroundClick}
         onDoubleClick={handleDoubleClick}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
         <TimelineGrid zoom={zoom} scrollLeft={scrollLeft} />
 
@@ -168,10 +216,16 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip }: T
         {loopEnabled && <LoopRegion zoom={zoom} scrollLeft={scrollLeft} />}
         <PeerCursors zoom={zoom} scrollLeft={scrollLeft} />
 
+        {dragOver && (
+          <div className="absolute inset-0 z-50 bg-blue-500/10 border-2 border-dashed border-blue-400/40 pointer-events-none rounded" />
+        )}
+
         <Playhead
           zoom={zoom}
           scrollLeft={scrollLeft}
         />
+
+        <MarkerTrack zoom={zoom} scrollLeft={scrollLeft} />
       </div>
     </div>
   );

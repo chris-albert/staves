@@ -55,6 +55,10 @@ export interface Clip {
   durationBeats: number;
   offsetBeats: number;
   gainDb: number;
+  /** Fade-in duration in beats (default 0). */
+  fadeInBeats: number;
+  /** Fade-out duration in beats (default 0). */
+  fadeOutBeats: number;
   /** Total duration of the source audio in beats (for non-destructive trim). */
   sourceDurationBeats: number;
   /** References DrumPattern.id for drum clips. When set, audioBlobId is ''. */
@@ -92,6 +96,14 @@ export interface DrumPattern {
   pads: DrumPadConfig[];
 }
 
+export interface Marker {
+  id: string;
+  projectId: string;
+  beat: number;
+  name: string;
+  color: string;
+}
+
 export interface AudioBlob {
   id: string;
   projectId: string;
@@ -115,6 +127,7 @@ const db = new Dexie('staves') as Dexie & {
   audioBlobs: EntityTable<AudioBlob, 'id'>;
   waveformCache: EntityTable<WaveformCache, 'audioBlobId'>;
   drumPatterns: EntityTable<DrumPattern, 'id'>;
+  markers: EntityTable<Marker, 'id'>;
 };
 
 db.version(1).stores({
@@ -210,6 +223,33 @@ db.version(6).stores({
     if (track.type === undefined) {
       track.type = 'audio';
     }
+  });
+});
+
+// Add timeline markers / cue points
+db.version(7).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+  drumPatterns: 'id, projectId',
+  markers: 'id, projectId, beat',
+});
+
+// Migrate existing clips to include fadeInBeats / fadeOutBeats
+db.version(8).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+  drumPatterns: 'id, projectId',
+  markers: 'id, projectId, beat',
+}).upgrade((tx) => {
+  return tx.table('clips').toCollection().modify((clip) => {
+    if (clip.fadeInBeats === undefined) clip.fadeInBeats = 0;
+    if (clip.fadeOutBeats === undefined) clip.fadeOutBeats = 0;
   });
 });
 

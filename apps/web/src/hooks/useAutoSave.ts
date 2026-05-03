@@ -21,13 +21,14 @@ export function useAutoSave() {
       const tempoChanged = state.tempoEvents !== prev.tempoEvents;
       const timeSigChanged = state.timeSignatureEvents !== prev.timeSignatureEvents;
       const drumPatternsChanged = state.drumPatterns !== prev.drumPatterns;
+      const markersChanged = state.markers !== prev.markers;
 
-      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged && !drumPatternsChanged) return;
+      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged && !drumPatternsChanged && !markersChanged) return;
 
       if (timerRef.current) clearTimeout(timerRef.current);
 
       timerRef.current = setTimeout(async () => {
-        const { project, tracks, clips, tempoEvents, timeSignatureEvents, drumPatterns } = useProjectStore.getState();
+        const { project, tracks, clips, tempoEvents, timeSignatureEvents, drumPatterns, markers } = useProjectStore.getState();
         if (!project) return;
 
         try {
@@ -70,6 +71,14 @@ export function useAutoSave() {
               stepsPerBeat: pattern.stepsPerBeat,
               activeSteps: pattern.activeSteps,
               pads: pattern.pads,
+            });
+          }
+
+          for (const marker of markers) {
+            await projectRepository.updateMarker(marker.id, {
+              beat: marker.beat,
+              name: marker.name,
+              color: marker.color,
             });
           }
         } catch (e) {

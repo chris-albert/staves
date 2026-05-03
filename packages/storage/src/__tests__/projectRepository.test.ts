@@ -90,6 +90,8 @@ describe('projectRepository', () => {
         durationBeats: 4,
         offsetBeats: 0,
         gainDb: 0,
+        fadeInBeats: 0,
+        fadeOutBeats: 0,
         sourceDurationBeats: 4,
       });
       await projectRepository.deleteTrack(track.id);
@@ -113,6 +115,8 @@ describe('projectRepository', () => {
         durationBeats: 8,
         offsetBeats: 0,
         gainDb: -3,
+        fadeInBeats: 0,
+        fadeOutBeats: 0,
         sourceDurationBeats: 8,
       });
       expect(clip.startBeat).toBe(4);
@@ -134,6 +138,8 @@ describe('projectRepository', () => {
         durationBeats: 4,
         offsetBeats: 0,
         gainDb: 0,
+        fadeInBeats: 0,
+        fadeOutBeats: 0,
         sourceDurationBeats: 4,
       });
       await projectRepository.updateClip(clip.id, { startBeat: 8 });

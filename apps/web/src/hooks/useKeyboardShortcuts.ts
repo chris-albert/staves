@@ -14,6 +14,11 @@ interface ShortcutHandlers {
   onDeselectAll: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
+  onSplit: () => void;
+  onDuplicate: () => void;
+  onAddMarker: () => void;
 }
 
 /**
@@ -28,6 +33,9 @@ interface ShortcutHandlers {
  * Cmd/Ctrl+A  — select all
  * Cmd/Ctrl+=  — zoom in
  * Cmd/Ctrl+-  — zoom out
+ * S           — split selected clips at playhead
+ * Cmd/Ctrl+D  — duplicate selected clips
+ * M           — add marker at playhead
  * Escape      — deselect all
  */
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
@@ -99,6 +107,41 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           if (mod) {
             e.preventDefault();
             handlers.onZoomOut();
+          }
+          break;
+
+        case 'KeyC':
+          if (mod) {
+            e.preventDefault();
+            handlers.onCopy();
+          }
+          break;
+
+        case 'KeyV':
+          if (mod) {
+            e.preventDefault();
+            handlers.onPaste();
+          }
+          break;
+
+        case 'KeyS':
+          if (!mod) {
+            e.preventDefault();
+            handlers.onSplit();
+          }
+          break;
+
+        case 'KeyD':
+          if (mod) {
+            e.preventDefault();
+            handlers.onDuplicate();
+          }
+          break;
+
+        case 'KeyM':
+          if (!mod) {
+            e.preventDefault();
+            handlers.onAddMarker();
           }
           break;
 

@@ -11,6 +11,8 @@ export interface ScheduledClip {
   durationBeats: number;
   offsetBeats: number;
   gainDb: number;
+  fadeInBeats: number;
+  fadeOutBeats: number;
 }
 
 export interface ScheduledDrumHit {

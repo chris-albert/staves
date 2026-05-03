@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Clip } from '@staves/storage';
 
 interface PeerCursor {
   clientId: number;
@@ -23,6 +24,8 @@ interface UiState {
   snapEnabled: boolean;
   snapDivision: number; // beats (e.g. 1 = snap to beat, 0.25 = snap to 16th)
   editingDrumClipId: string | null;
+  clipboard: Clip[];
+  contextMenu: { x: number; y: number; clipId: string } | null;
 }
 
 interface UiActions {
@@ -37,6 +40,8 @@ interface UiActions {
   setSnapEnabled: (enabled: boolean) => void;
   setSnapDivision: (division: number) => void;
   setEditingDrumClipId: (id: string | null) => void;
+  setClipboard: (clips: Clip[]) => void;
+  setContextMenu: (menu: UiState['contextMenu']) => void;
 }
 
 export const useUiStore = create<UiState & UiActions>()((set) => ({
@@ -50,6 +55,8 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   snapEnabled: true,
   snapDivision: 1,
   editingDrumClipId: null,
+  clipboard: [],
+  contextMenu: null,
 
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(200, zoom)) }),
   setScrollLeft: (scrollLeft) => set({ scrollLeft: Math.max(0, scrollLeft) }),
@@ -73,4 +80,6 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
   setSnapDivision: (snapDivision) => set({ snapDivision }),
   setEditingDrumClipId: (editingDrumClipId) => set({ editingDrumClipId }),
+  setClipboard: (clipboard) => set({ clipboard }),
+  setContextMenu: (contextMenu) => set({ contextMenu }),
 }));

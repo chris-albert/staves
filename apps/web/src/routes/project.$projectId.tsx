@@ -1,7 +1,7 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useCallback, useState, useMemo } from 'react';
 import { AudioEngine, DEFAULT_DRUM_KIT } from '@staves/audio-engine';
-import { projectRepository } from '@staves/storage';
+import { projectRepository, audioBlobStore } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTransportStore } from '@/stores/transportStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -25,6 +25,7 @@ import { MetronomeLane } from '@/components/timeline/MetronomeLane';
 import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
 import { StepSequencer } from '@/components/sequencer/StepSequencer';
+import { ClipContextMenu } from '@/components/timeline/ClipContextMenu';
 import { rootRoute } from './__root';
 
 export const projectRoute = createRoute({
@@ -45,12 +46,16 @@ function DawEditorPage() {
   const setClips = useProjectStore((s) => s.setClips);
   const addTrack = useProjectStore((s) => s.addTrack);
   const addClip = useProjectStore((s) => s.addClip);
+  const updateClip = useProjectStore((s) => s.updateClip);
   const removeClip = useProjectStore((s) => s.removeClip);
   const tracks = useProjectStore((s) => s.tracks);
   const clips = useProjectStore((s) => s.clips);
   const drumPatterns = useProjectStore((s) => s.drumPatterns);
   const setDrumPatterns = useProjectStore((s) => s.setDrumPatterns);
   const addDrumPattern = useProjectStore((s) => s.addDrumPattern);
+  const markers = useProjectStore((s) => s.markers);
+  const setMarkers = useProjectStore((s) => s.setMarkers);
+  const addMarker = useProjectStore((s) => s.addMarker);
   const reset = useProjectStore((s) => s.reset);
   const setBpm = useTransportStore((s) => s.setBpm);
   const isPlaying = useTransportStore((s) => s.isPlaying);
@@ -60,6 +65,8 @@ function DawEditorPage() {
   const zoom = useUiStore((s) => s.zoom);
   const setZoom = useUiStore((s) => s.setZoom);
   const editingDrumClipId = useUiStore((s) => s.editingDrumClipId);
+  const contextMenu = useUiStore((s) => s.contextMenu);
+  const setContextMenu = useUiStore((s) => s.setContextMenu);
 
   // Preferences window
   const [prefsOpen, setPrefsOpen] = useState(false);
@@ -122,6 +129,8 @@ function DawEditorPage() {
         setClips(loadedClips);
         const loadedPatterns = await projectRepository.getDrumPatterns(projectId);
         setDrumPatterns(loadedPatterns);
+        const loadedMarkers = await projectRepository.getMarkers(projectId);
+        setMarkers(loadedMarkers);
       } else {
         // Joining a remote session — set a skeleton project so the UI renders.
         // Yjs sync (via projectSync hydration) will replace this with the real data.
@@ -140,7 +149,7 @@ function DawEditorPage() {
     }
     load();
     return () => reset();
-  }, [projectId, navigate, setProject, setTracks, setClips, setDrumPatterns, setBpm, reset, roomId]);
+  }, [projectId, navigate, setProject, setTracks, setClips, setDrumPatterns, setMarkers, setBpm, reset, roomId]);
 
   // --- Transport handlers ---
   const { play, stop } = useTransportHooks();
@@ -169,6 +178,8 @@ function DawEditorPage() {
       durationBeats: result.durationBeats,
       offsetBeats: 0,
       gainDb: 0,
+      fadeInBeats: 0,
+      fadeOutBeats: 0,
       sourceDurationBeats: result.durationBeats,
     });
     addClip(clip);
@@ -232,6 +243,8 @@ function DawEditorPage() {
       durationBeats,
       offsetBeats: 0,
       gainDb: 0,
+      fadeInBeats: 0,
+      fadeOutBeats: 0,
       sourceDurationBeats: durationBeats,
       drumPatternId: pattern.id,
     });
@@ -267,11 +280,79 @@ function DawEditorPage() {
       durationBeats,
       offsetBeats: 0,
       gainDb: 0,
+      fadeInBeats: 0,
+      fadeOutBeats: 0,
       sourceDurationBeats: durationBeats,
       drumPatternId: pattern.id,
     });
     addClip(clip);
   }, [project, addDrumPattern, addClip]);
+
+  // --- Drag-and-drop audio file import ---
+  const handleDropAudioFile = useCallback(async (trackId: string, startBeat: number, file: File) => {
+    if (!project) return;
+
+    try {
+      const engine = AudioEngine.getInstance();
+      await engine.init();
+
+      // Read file as ArrayBuffer and decode to get duration
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await engine.context.decodeAudioData(arrayBuffer.slice(0));
+
+      // Store as blob in IndexedDB
+      const blob = new Blob([arrayBuffer], { type: file.type || 'audio/wav' });
+      const durationSeconds = audioBuffer.duration;
+
+      // Determine format
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      const format = ext === 'webm' ? 'webm-opus' : 'mp4-aac';
+
+      const audioBlob = await audioBlobStore.store(
+        project.id,
+        blob,
+        format as 'webm-opus' | 'mp4-aac',
+        audioBuffer.sampleRate,
+        durationSeconds,
+      );
+
+      // Calculate duration in beats
+      const bpm = useTransportStore.getState().bpm;
+      const durationBeats = (durationSeconds * bpm) / 60;
+
+      const clip = await projectRepository.createClip({
+        trackId,
+        projectId: project.id,
+        audioBlobId: audioBlob.id,
+        name: file.name.replace(/\.[^.]+$/, ''),
+        startBeat,
+        durationBeats,
+        offsetBeats: 0,
+        gainDb: 0,
+        fadeInBeats: 0,
+        fadeOutBeats: 0,
+        sourceDurationBeats: durationBeats,
+      });
+      addClip(clip);
+    } catch (err) {
+      console.error('Failed to import audio file:', err);
+    }
+  }, [project, addClip]);
+
+  // --- Add marker at playhead ---
+  const handleAddMarker = useCallback(async () => {
+    if (!project) return;
+    const currentBeat = useTransportStore.getState().currentBeat;
+    const existingMarkers = useProjectStore.getState().markers;
+    const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
+    const marker = await projectRepository.createMarker({
+      projectId: project.id,
+      beat: currentBeat,
+      name: `Marker ${existingMarkers.length + 1}`,
+      color: colors[existingMarkers.length % colors.length]!,
+    });
+    addMarker(marker);
+  }, [project, addMarker]);
 
   // --- Clip deletion ---
   const handleDeleteSelected = useCallback(() => {
@@ -304,6 +385,169 @@ function DawEditorPage() {
     }
   }, [roomId]);
 
+  // --- Copy / Paste ---
+  const handleCopy = useCallback(() => {
+    const { selectedClipIds } = useUiStore.getState();
+    const currentClips = useProjectStore.getState().clips;
+    const selectedClips = currentClips.filter((c) => selectedClipIds.has(c.id));
+    if (selectedClips.length > 0) {
+      useUiStore.getState().setClipboard(selectedClips);
+    }
+  }, []);
+
+  const handlePaste = useCallback(async () => {
+    const { clipboard } = useUiStore.getState();
+    if (clipboard.length === 0 || !project) return;
+
+    const currentBeat = useTransportStore.getState().currentBeat;
+    const pasteOffset = currentBeat - Math.min(...clipboard.map((c) => c.startBeat));
+
+    const newClipIds: string[] = [];
+
+    for (const clipData of clipboard) {
+      let drumPatternId = clipData.drumPatternId;
+
+      // If this is a drum clip, duplicate the drum pattern
+      if (drumPatternId) {
+        const currentPatterns = useProjectStore.getState().drumPatterns;
+        const sourcePattern = currentPatterns.find((p) => p.id === drumPatternId);
+        if (sourcePattern) {
+          const newPattern = await projectRepository.createDrumPattern({
+            projectId: project.id,
+            steps: sourcePattern.steps,
+            stepsPerBeat: sourcePattern.stepsPerBeat,
+            activeSteps: sourcePattern.activeSteps.map((s) => ({ ...s })),
+            pads: sourcePattern.pads.map((p) => ({ ...p })),
+          });
+          addDrumPattern(newPattern);
+          drumPatternId = newPattern.id;
+        }
+      }
+
+      const newClip = await projectRepository.createClip({
+        trackId: clipData.trackId,
+        projectId: project.id,
+        audioBlobId: clipData.audioBlobId,
+        name: clipData.name,
+        startBeat: clipData.startBeat + pasteOffset,
+        durationBeats: clipData.durationBeats,
+        offsetBeats: clipData.offsetBeats,
+        gainDb: clipData.gainDb,
+        fadeInBeats: clipData.fadeInBeats ?? 0,
+        fadeOutBeats: clipData.fadeOutBeats ?? 0,
+        sourceDurationBeats: clipData.sourceDurationBeats,
+        ...(drumPatternId ? { drumPatternId } : {}),
+      });
+      addClip(newClip);
+      newClipIds.push(newClip.id);
+    }
+
+    // Select only the newly pasted clips
+    deselectAll();
+    for (const id of newClipIds) {
+      selectClip(id, true);
+    }
+  }, [project, addClip, addDrumPattern, deselectAll, selectClip]);
+
+  // --- Split clip at playhead (S key) ---
+  const handleSplit = useCallback(async () => {
+    if (!project) return;
+    const splitBeat = useTransportStore.getState().currentBeat;
+    const ids = useUiStore.getState().selectedClipIds;
+    const allClips = useProjectStore.getState().clips;
+    const selected = allClips.filter((c) => ids.has(c.id));
+    const newIds: string[] = [];
+
+    for (const clip of selected) {
+      const end = clip.startBeat + clip.durationBeats;
+      // Only split if the playhead is strictly within the clip's range
+      if (splitBeat <= clip.startBeat || splitBeat >= end) continue;
+      // Skip drum clips
+      if (clip.drumPatternId) continue;
+
+      const leftDur = splitBeat - clip.startBeat;
+      const rightDur = clip.durationBeats - leftDur;
+
+      // Update the original clip (left half) -- shrink its duration
+      updateClip(clip.id, { durationBeats: leftDur });
+      projectRepository.updateClip(clip.id, { durationBeats: leftDur });
+
+      // Create the right half as a new clip
+      const rightClip = await projectRepository.createClip({
+        trackId: clip.trackId,
+        projectId: clip.projectId,
+        audioBlobId: clip.audioBlobId,
+        name: clip.name,
+        startBeat: splitBeat,
+        durationBeats: rightDur,
+        offsetBeats: clip.offsetBeats + leftDur,
+        gainDb: clip.gainDb,
+        fadeInBeats: 0,
+        fadeOutBeats: clip.fadeOutBeats,
+        sourceDurationBeats: clip.sourceDurationBeats,
+      });
+      addClip(rightClip);
+      newIds.push(rightClip.id);
+    }
+
+    if (newIds.length > 0) {
+      deselectAll();
+      for (const id of newIds) selectClip(id, true);
+    }
+  }, [project, addClip, updateClip, deselectAll, selectClip]);
+
+  // --- Duplicate selected clips (Cmd/Ctrl+D) ---
+  const handleDuplicate = useCallback(async () => {
+    if (!project) return;
+    const ids = useUiStore.getState().selectedClipIds;
+    const allClips = useProjectStore.getState().clips;
+    const selected = allClips.filter((c) => ids.has(c.id));
+    const newIds: string[] = [];
+
+    for (const clip of selected) {
+      let dpId = clip.drumPatternId;
+
+      // If this is a drum clip, duplicate the drum pattern too
+      if (dpId) {
+        const patterns = useProjectStore.getState().drumPatterns;
+        const src = patterns.find((p) => p.id === dpId);
+        if (src) {
+          const np = await projectRepository.createDrumPattern({
+            projectId: project.id,
+            steps: src.steps,
+            stepsPerBeat: src.stepsPerBeat,
+            activeSteps: src.activeSteps.map((s) => ({ ...s })),
+            pads: src.pads.map((p) => ({ ...p })),
+          });
+          addDrumPattern(np);
+          dpId = np.id;
+        }
+      }
+
+      const dup = await projectRepository.createClip({
+        trackId: clip.trackId,
+        projectId: project.id,
+        audioBlobId: clip.audioBlobId,
+        name: clip.name + ' copy',
+        startBeat: clip.startBeat + clip.durationBeats,
+        durationBeats: clip.durationBeats,
+        offsetBeats: clip.offsetBeats,
+        gainDb: clip.gainDb,
+        fadeInBeats: clip.fadeInBeats,
+        fadeOutBeats: clip.fadeOutBeats,
+        sourceDurationBeats: clip.sourceDurationBeats,
+        ...(dpId ? { drumPatternId: dpId } : {}),
+      });
+      addClip(dup);
+      newIds.push(dup.id);
+    }
+
+    if (newIds.length > 0) {
+      deselectAll();
+      for (const id of newIds) selectClip(id, true);
+    }
+  }, [project, addClip, addDrumPattern, deselectAll, selectClip]);
+
   // --- Zoom ---
   const handleZoomIn = useCallback(() => setZoom(zoom * 1.25), [zoom, setZoom]);
   const handleZoomOut = useCallback(() => setZoom(zoom / 1.25), [zoom, setZoom]);
@@ -324,8 +568,13 @@ function DawEditorPage() {
       onDeselectAll: deselectAll,
       onZoomIn: handleZoomIn,
       onZoomOut: handleZoomOut,
+      onCopy: handleCopy,
+      onPaste: handlePaste,
+      onSplit: handleSplit,
+      onDuplicate: handleDuplicate,
+      onAddMarker: handleAddMarker,
     }),
-    [play, stop, isPlaying, handleRecord, handleStopRecord, isRecording, undo, redo, handleDeleteSelected, handleSelectAll, deselectAll, handleZoomIn, handleZoomOut],
+    [play, stop, isPlaying, handleRecord, handleStopRecord, isRecording, undo, redo, handleDeleteSelected, handleSelectAll, deselectAll, handleZoomIn, handleZoomOut, handleCopy, handlePaste, handleSplit, handleDuplicate, handleAddMarker],
   );
   useKeyboardShortcuts(shortcutHandlers);
 
@@ -356,7 +605,7 @@ function DawEditorPage() {
         metronomeLane={<MetronomeLane />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         masterLane={<MasterLane />}
-        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} />}
+        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onDropAudioFile={handleDropAudioFile} />}
         bottomPanel={(() => {
           if (!editingDrumClipId) return undefined;
           const editClip = clips.find((c) => c.id === editingDrumClipId);
@@ -393,6 +642,21 @@ function DawEditorPage() {
         projectName={project.name}
         onImported={(id) => navigate({ to: '/project/$projectId', params: { projectId: id }, search: { roomId: undefined } })}
       />
+
+      {contextMenu && (
+        <ClipContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            { label: 'Copy', shortcut: '\u2318C', onClick: handleCopy },
+            { label: 'Paste', shortcut: '\u2318V', onClick: handlePaste, disabled: useUiStore.getState().clipboard.length === 0 },
+            { label: 'Duplicate', shortcut: '\u2318D', onClick: handleDuplicate },
+            { label: 'Split at Playhead', shortcut: 'S', onClick: handleSplit },
+            { label: 'Delete', shortcut: '\u232B', onClick: handleDeleteSelected, danger: true },
+          ]}
+        />
+      )}
     </>
   );
 }

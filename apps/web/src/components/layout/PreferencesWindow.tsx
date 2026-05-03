@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { AudioEngine } from '@staves/audio-engine';
-import { exportProject, importProject } from '@staves/storage';
+import { AudioEngine, TempoMap, exportToWav } from '@staves/audio-engine';
+import type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit } from '@staves/audio-engine';
+import { exportProject, importProject, audioBlobStore } from '@staves/storage';
+import { useProjectStore } from '@/stores/projectStore';
 import type { AudioDevice } from '@/hooks/useAudioDevices';
 
 type Tab = 'audio' | 'collaborate' | 'file';
@@ -278,6 +280,129 @@ function FileTab({ projectId, projectName, onImported, onClose }: PreferencesWin
   const [status, setStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const tracks = useProjectStore((s) => s.tracks);
+  const clips = useProjectStore((s) => s.clips);
+  const drumPatterns = useProjectStore((s) => s.drumPatterns);
+  const tempoEvents = useProjectStore((s) => s.tempoEvents);
+  const timeSignatureEvents = useProjectStore((s) => s.timeSignatureEvents);
+
+  const handleExportWav = async () => {
+    if (!projectId) return;
+    try {
+      setStatus('Rendering WAV...');
+      const engine = AudioEngine.getInstance();
+      await engine.init();
+
+      const tempoMap = new TempoMap(tempoEvents, timeSignatureEvents);
+
+      const anySoloed = tracks.some((t) => t.isSolo);
+      const trackVolumes = new Map<string, number>();
+      const trackPans = new Map<string, number>();
+      const trackMuted = new Map<string, boolean>();
+      for (const track of tracks) {
+        trackVolumes.set(track.id, track.volume);
+        trackPans.set(track.id, track.pan);
+        trackMuted.set(track.id, anySoloed ? !track.isSolo : track.isMuted);
+      }
+
+      const scheduledClips: ScheduledClip[] = [];
+      for (const clip of clips) {
+        if (clip.drumPatternId) continue;
+        if (!clip.audioBlobId) continue;
+        let buffer = engine.clipPlayer.getBuffer(clip.audioBlobId);
+        if (!buffer) {
+          const audioBlob = await audioBlobStore.get(clip.audioBlobId);
+          if (audioBlob) {
+            buffer = await engine.clipPlayer.decodeBlob(clip.audioBlobId, audioBlob.data);
+          }
+        }
+        if (!buffer) continue;
+        scheduledClips.push({
+          clipId: clip.id,
+          trackId: clip.trackId,
+          buffer,
+          startBeat: clip.startBeat,
+          durationBeats: clip.durationBeats,
+          offsetBeats: clip.offsetBeats,
+          gainDb: clip.gainDb,
+          fadeInBeats: clip.fadeInBeats ?? 0,
+          fadeOutBeats: clip.fadeOutBeats ?? 0,
+        });
+      }
+
+      const patternMap = new Map(drumPatterns.map((p) => [p.id, p]));
+      const scheduledDrumClips: ScheduledDrumClip[] = [];
+      const drumSampleBuffers = new Map<string, AudioBuffer>();
+
+      for (const clip of clips) {
+        if (!clip.drumPatternId) continue;
+        const pattern = patternMap.get(clip.drumPatternId);
+        if (!pattern) continue;
+
+        for (const pad of pattern.pads) {
+          if (pad.sampleUrl && !drumSampleBuffers.has(pad.sampleUrl)) {
+            const buf = engine.drumSampler.getBuffer(pad.sampleUrl);
+            if (buf) drumSampleBuffers.set(pad.sampleUrl, buf);
+          }
+        }
+
+        const hits: ScheduledDrumHit[] = [];
+        const beatPerStep = 1 / pattern.stepsPerBeat;
+        for (const step of pattern.activeSteps) {
+          const pad = pattern.pads[step.padIndex];
+          if (!pad) continue;
+          hits.push({
+            beat: clip.startBeat + step.step * beatPerStep,
+            sampleKey: pad.sampleUrl,
+            velocity: step.velocity,
+          });
+        }
+
+        scheduledDrumClips.push({
+          clipId: clip.id,
+          trackId: clip.trackId,
+          startBeat: clip.startBeat,
+          durationBeats: clip.durationBeats,
+          hits,
+        });
+      }
+
+      let maxEndBeat = 0;
+      for (const clip of clips) {
+        maxEndBeat = Math.max(maxEndBeat, clip.startBeat + clip.durationBeats);
+      }
+      if (maxEndBeat <= 0) {
+        setStatus('No clips to export');
+        return;
+      }
+      maxEndBeat += 1;
+
+      const wavBlob = await exportToWav({
+        sampleRate: 48000,
+        durationBeats: maxEndBeat,
+        tempoMap,
+        clips: scheduledClips,
+        drumClips: scheduledDrumClips,
+        drumSampleBuffers,
+        trackVolumes,
+        trackPans,
+        trackMuted,
+        masterVolume: engine.masterBus.volume,
+      });
+
+      const url = URL.createObjectURL(wavBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${projectName || 'project'}.wav`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus('WAV exported!');
+      setTimeout(() => setStatus(null), 3000);
+    } catch (e) {
+      setStatus(`WAV export failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
   const handleExport = async () => {
     if (!projectId) return;
     try {
@@ -313,14 +438,25 @@ function FileTab({ projectId, projectName, onImported, onClose }: PreferencesWin
       <SectionHeader title="File / Export" description="Export your project as a backup or import an existing one." />
 
       {projectId && (
-        <SettingsRow label="Export Project" description="Download as a .staves file including all audio">
-          <button
-            onClick={handleExport}
-            className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white transition-colors"
-          >
-            Export .staves
-          </button>
-        </SettingsRow>
+        <>
+          <SettingsRow label="Export Project" description="Download as a .staves file including all audio">
+            <button
+              onClick={handleExport}
+              className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white transition-colors"
+            >
+              Export .staves
+            </button>
+          </SettingsRow>
+
+          <SettingsRow label="Export WAV" description="Render and download as a stereo WAV file">
+            <button
+              onClick={handleExportWav}
+              className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-medium text-zinc-900 hover:bg-white transition-colors"
+            >
+              Export WAV
+            </button>
+          </SettingsRow>
+        </>
       )}
 
       <SettingsRow label="Import Project" description="Load a .staves file into your library">
