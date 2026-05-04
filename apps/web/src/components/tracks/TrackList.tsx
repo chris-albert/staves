@@ -2,18 +2,20 @@ import { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { TrackHeader } from './TrackHeader';
 import { DrumTrackHeader } from './DrumTrackHeader';
+import { MidiTrackHeader } from './MidiTrackHeader';
 import type { AudioDevice } from '@/hooks/useAudioDevices';
 import type { StereoLevel } from '@/hooks/useTrackLevels';
 
 interface TrackListProps {
   onAddTrack: () => void;
   onAddDrumTrack?: () => void;
+  onAddMidiTrack?: () => void;
   recordingLevel: number;
   audioInputs: AudioDevice[];
   trackLevels: Map<string, StereoLevel>;
 }
 
-export function TrackList({ onAddTrack, onAddDrumTrack, recordingLevel, audioInputs, trackLevels }: TrackListProps) {
+export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordingLevel, audioInputs, trackLevels }: TrackListProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -39,6 +41,16 @@ export function TrackList({ onAddTrack, onAddDrumTrack, recordingLevel, audioInp
         if (track.type === 'drum') {
           return (
             <DrumTrackHeader
+              key={track.id}
+              track={track}
+              stereoLevel={stereo}
+            />
+          );
+        }
+
+        if (track.type === 'midi') {
+          return (
+            <MidiTrackHeader
               key={track.id}
               track={track}
               stereoLevel={stereo}
@@ -88,6 +100,19 @@ export function TrackList({ onAddTrack, onAddDrumTrack, recordingLevel, audioInp
                   <ellipse cx="6" cy="5" rx="5" ry="2.5" stroke="currentColor" strokeWidth="1" fill="currentColor" fillOpacity="0.15" />
                 </svg>
                 Drum Track
+              </button>
+            )}
+            {onAddMidiTrack && (
+              <button
+                onClick={() => { onAddMidiTrack(); setShowAddMenu(false); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-zinc-400">
+                  <rect x="1" y="7" width="2" height="4" rx="0.5" stroke="currentColor" strokeWidth="0.8" fill="currentColor" fillOpacity="0.15" />
+                  <rect x="4" y="5" width="2" height="6" rx="0.5" stroke="currentColor" strokeWidth="0.8" fill="currentColor" fillOpacity="0.15" />
+                  <rect x="7" y="3" width="2" height="8" rx="0.5" stroke="currentColor" strokeWidth="0.8" fill="currentColor" fillOpacity="0.15" />
+                </svg>
+                MIDI / Synth Track
               </button>
             )}
           </div>

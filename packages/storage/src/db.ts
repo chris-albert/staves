@@ -27,7 +27,7 @@ export interface Project {
   timeSignatureEvents?: TimeSignatureEventData[];
 }
 
-export type TrackType = 'audio' | 'drum';
+export type TrackType = 'audio' | 'drum' | 'midi';
 
 export interface Track {
   id: string;
@@ -63,6 +63,8 @@ export interface Clip {
   sourceDurationBeats: number;
   /** References DrumPattern.id for drum clips. When set, audioBlobId is ''. */
   drumPatternId?: string;
+  /** References MidiPattern.id for MIDI clips. When set, audioBlobId is ''. */
+  midiPatternId?: string;
 }
 
 export interface DrumStep {
@@ -96,6 +98,47 @@ export interface DrumPattern {
   pads: DrumPadConfig[];
 }
 
+export type OscillatorWaveform = 'sine' | 'sawtooth' | 'square' | 'triangle';
+export type FilterType = 'lowpass' | 'highpass' | 'bandpass';
+
+export interface ADSREnvelope {
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+}
+
+export interface SynthPatch {
+  oscillator: {
+    waveform: OscillatorWaveform;
+    detune: number;
+    octaveOffset: number;
+  };
+  filter: {
+    type: FilterType;
+    cutoff: number;
+    resonance: number;
+  };
+  ampEnvelope: ADSREnvelope;
+  filterEnvelope: ADSREnvelope & { amount: number };
+}
+
+export interface MidiNote {
+  id: string;
+  pitch: number;
+  startBeat: number;
+  durationBeats: number;
+  velocity: number;
+}
+
+export interface MidiPattern {
+  id: string;
+  projectId: string;
+  durationBeats: number;
+  notes: MidiNote[];
+  synthPatch: SynthPatch;
+}
+
 export interface Marker {
   id: string;
   projectId: string;
@@ -127,6 +170,7 @@ const db = new Dexie('staves') as Dexie & {
   audioBlobs: EntityTable<AudioBlob, 'id'>;
   waveformCache: EntityTable<WaveformCache, 'audioBlobId'>;
   drumPatterns: EntityTable<DrumPattern, 'id'>;
+  midiPatterns: EntityTable<MidiPattern, 'id'>;
   markers: EntityTable<Marker, 'id'>;
 };
 
@@ -251,6 +295,18 @@ db.version(8).stores({
     if (clip.fadeInBeats === undefined) clip.fadeInBeats = 0;
     if (clip.fadeOutBeats === undefined) clip.fadeOutBeats = 0;
   });
+});
+
+// Add MIDI synth track support: MidiPattern table
+db.version(9).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+  drumPatterns: 'id, projectId',
+  midiPatterns: 'id, projectId',
+  markers: 'id, projectId, beat',
 });
 
 export { db };

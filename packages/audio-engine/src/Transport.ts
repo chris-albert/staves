@@ -33,9 +33,32 @@ export interface ScheduledDrumClip {
   hits: ScheduledDrumHit[];
 }
 
+export interface ScheduledMidiNote {
+  /** Absolute beat position on the timeline. */
+  beat: number;
+  /** Duration in beats. */
+  durationBeats: number;
+  /** MIDI pitch 0-127. */
+  pitch: number;
+  /** Velocity 0-1. */
+  velocity: number;
+}
+
+export interface ScheduledMidiClip {
+  clipId: string;
+  trackId: string;
+  startBeat: number;
+  durationBeats: number;
+  /** Pre-expanded list of all notes positioned in absolute timeline beats. */
+  notes: ScheduledMidiNote[];
+  /** The synth patch to use for this clip. */
+  synthPatch: import('@staves/storage').SynthPatch;
+}
+
 export interface ScheduleWindow {
   clips: ScheduledClip[];
   drumClips: ScheduledDrumClip[];
+  midiClips: ScheduledMidiClip[];
   fromBeat: number;
   toBeat: number;
   /** Converts a beat position to an absolute AudioContext time for scheduling. */
@@ -64,6 +87,7 @@ export class Transport {
   private clipScheduler: ClipScheduler | null = null;
   private clips: ScheduledClip[] = [];
   private drumClips: ScheduledDrumClip[] = [];
+  private midiClips: ScheduledMidiClip[] = [];
 
   // Look-ahead config
   private readonly scheduleAheadTime = 0.1; // seconds
@@ -90,7 +114,16 @@ export class Transport {
     if (this.state === 'stopped') return this.startBeatOffset;
     const elapsed = this.context.currentTime - this.startContextTime;
     const startSeconds = this.tempoMap.beatsToSeconds(this.startBeatOffset);
-    return this.tempoMap.secondsToBeats(startSeconds + elapsed);
+    const beat = this.tempoMap.secondsToBeats(startSeconds + elapsed);
+
+    // When looping, wrap the beat into the loop region
+    if (this._loopEnabled && this._loopEnd > this._loopStart) {
+      const loopLen = this._loopEnd - this._loopStart;
+      if (beat >= this._loopEnd) {
+        return this._loopStart + ((beat - this._loopStart) % loopLen);
+      }
+    }
+    return beat;
   }
 
   /** The beat position where playback was initiated from. */
@@ -142,6 +175,10 @@ export class Transport {
     this.drumClips = clips;
   }
 
+  setMidiClips(clips: ScheduledMidiClip[]): void {
+    this.midiClips = clips;
+  }
+
   play(): void {
     if (this.state !== 'stopped') return;
     this._playOrigin = this.startBeatOffset;
@@ -189,16 +226,49 @@ export class Transport {
     }
   }
 
-  private scheduleLoop(): void {
-    const startCtx = this.startContextTime;
-    const startSeconds = this.tempoMap.beatsToSeconds(this.startBeatOffset);
+  /** Callback invoked on each loop wrap so external code can clear per-session state. */
+  private onLoopWrap: (() => void) | null = null;
 
+  setOnLoopWrap(cb: (() => void) | null): void {
+    this.onLoopWrap = cb;
+  }
+
+  private scheduleLoop(): void {
     while (this.nextScheduleTime < this.context.currentTime + this.scheduleAheadTime) {
+      const startCtx = this.startContextTime;
+      const startSeconds = this.tempoMap.beatsToSeconds(this.startBeatOffset);
+
       const windowElapsed = this.nextScheduleTime - startCtx;
       const windowEndElapsed = windowElapsed + this.scheduleAheadTime;
 
       const windowStartBeat = this.tempoMap.secondsToBeats(startSeconds + windowElapsed);
-      const windowEndBeat = this.tempoMap.secondsToBeats(startSeconds + windowEndElapsed);
+      let windowEndBeat = this.tempoMap.secondsToBeats(startSeconds + windowEndElapsed);
+
+      // Loop wrapping: if the window start is already past loopEnd, reset immediately
+      if (this._loopEnabled && this._loopEnd > this._loopStart && windowStartBeat >= this._loopEnd) {
+        this.startBeatOffset = this._loopStart;
+        this.startContextTime = this.nextScheduleTime;
+        this.lastScheduledMetronomeBeat = this._loopStart - 1;
+        if (this.onLoopWrap) this.onLoopWrap();
+        continue;
+      }
+
+      // If the window crosses loopEnd, schedule up to loopEnd, then reset
+      // origin so the *next* while iteration schedules from loopStart seamlessly
+      let needsLoopReset = false;
+      if (this._loopEnabled && this._loopEnd > this._loopStart && windowEndBeat > this._loopEnd) {
+        // Calculate the exact context time when loopEnd is reached
+        const loopEndSec = this.tempoMap.beatsToSeconds(this._loopEnd);
+        const loopEndContextTime = startCtx + (loopEndSec - startSeconds);
+
+        windowEndBeat = this._loopEnd;
+        needsLoopReset = true;
+
+        // After scheduling this partial window, advance nextScheduleTime only
+        // to the loop boundary, then reset. The remainder will be picked up
+        // in the next while iteration from loopStart with no gap.
+        this.nextScheduleTime = loopEndContextTime;
+      }
 
       // Convert beat → AudioContext time
       const beatToCtxTime = (beat: number) => {
@@ -211,6 +281,7 @@ export class Transport {
         this.clipScheduler({
           clips: this.clips,
           drumClips: this.drumClips,
+          midiClips: this.midiClips,
           fromBeat: windowStartBeat,
           toBeat: windowEndBeat,
           beatToContextTime: beatToCtxTime,
@@ -233,7 +304,17 @@ export class Transport {
         }
       }
 
-      this.nextScheduleTime += this.scheduleAheadTime;
+      if (needsLoopReset) {
+        // Reset origin to loopStart at the exact moment loopEnd was reached
+        this.startBeatOffset = this._loopStart;
+        this.startContextTime = this.nextScheduleTime;
+        this.lastScheduledMetronomeBeat = this._loopStart - 1;
+        if (this.onLoopWrap) this.onLoopWrap();
+        // Don't advance nextScheduleTime — it's already set to loopEnd context time.
+        // The next while iteration will immediately schedule from loopStart.
+      } else {
+        this.nextScheduleTime += this.scheduleAheadTime;
+      }
     }
 
     this.timerId = setTimeout(() => this.scheduleLoop(), this.timerInterval);

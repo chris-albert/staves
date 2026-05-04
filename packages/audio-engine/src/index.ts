@@ -1,9 +1,10 @@
 export { AudioEngine } from './AudioEngine';
 export { Transport } from './Transport';
-export type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit, ScheduleWindow } from './Transport';
+export type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit, ScheduledMidiClip, ScheduledMidiNote, ScheduleWindow } from './Transport';
+export { Synth, DEFAULT_SYNTH_PATCH } from './Synth';
 export { DrumSampler } from './DrumSampler';
-export { DEFAULT_DRUM_KIT } from './DrumKit';
-export type { DrumKitSound } from './DrumKit';
+export { DEFAULT_DRUM_KIT, DRUM_KIT_BANKS, ALL_DRUM_SOUNDS } from './DrumKit';
+export type { DrumKitSound, DrumKitBank } from './DrumKit';
 export { TrackNode } from './TrackNode';
 export { MasterBus } from './MasterBus';
 export { ClipPlayer } from './ClipPlayer';

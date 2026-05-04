@@ -1,5 +1,6 @@
 import type { Track } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
+import { useUiStore } from '@/stores/uiStore';
 import { LevelMeter } from './LevelMeter';
 import { InputSelect } from './InputSelect';
 import { Knob } from '@staves/ui';
@@ -23,6 +24,9 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
   const updateTrack = useProjectStore((s) => s.updateTrack);
   const removeTrack = useProjectStore((s) => s.removeTrack);
   const tracks = useProjectStore((s) => s.tracks);
+  const selectedTrackId = useUiStore((s) => s.selectedTrackId);
+  const setSelectedTrackId = useUiStore((s) => s.setSelectedTrackId);
+  const isSelected = selectedTrackId === track.id;
 
   const anySoloed = tracks.some((t) => t.isSolo);
   const effectivelyMuted = anySoloed && !track.isSolo;
@@ -93,7 +97,14 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
 
   return (
     <div
-      className="group flex h-20 items-stretch border-b border-zinc-800/80 transition-colors hover:bg-zinc-900/50"
+      onClick={(e) => {
+        // Don't toggle selection when interacting with controls inside the header
+        if ((e.target as HTMLElement).closest('button, input, select')) return;
+        setSelectedTrackId(isSelected ? null : track.id);
+      }}
+      className={`group flex h-20 items-stretch border-b border-zinc-800/80 transition-colors cursor-pointer ${
+        isSelected ? 'bg-zinc-800/70' : 'hover:bg-zinc-900/50'
+      }`}
       style={{ opacity: effectivelyMuted ? 0.45 : 1, transition: 'opacity 0.15s ease' }}
     >
       {/* Color bar — click to change color */}

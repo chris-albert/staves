@@ -1,4 +1,4 @@
-import { db, type Project, type Track, type Clip, type DrumPattern, type TrackType, type Marker } from './db';
+import { db, type Project, type Track, type Clip, type DrumPattern, type MidiPattern, type TrackType, type Marker } from './db';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -47,13 +47,14 @@ export const projectRepository = {
   },
 
   async deleteProject(id: string): Promise<void> {
-    await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.waveformCache, db.drumPatterns, db.markers], async () => {
+    await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.waveformCache, db.drumPatterns, db.midiPatterns, db.markers], async () => {
       const clips = await db.clips.where('projectId').equals(id).toArray();
       const audioBlobIds = [...new Set(clips.map((c) => c.audioBlobId).filter(Boolean))];
 
       await db.clips.where('projectId').equals(id).delete();
       await db.tracks.where('projectId').equals(id).delete();
       await db.drumPatterns.where('projectId').equals(id).delete();
+      await db.midiPatterns.where('projectId').equals(id).delete();
       await db.markers.where('projectId').equals(id).delete();
       await db.audioBlobs.where('projectId').equals(id).delete();
       for (const blobId of audioBlobIds) {
@@ -168,5 +169,29 @@ export const projectRepository = {
 
   async deleteMarker(id: string): Promise<void> {
     await db.markers.delete(id);
+  },
+
+  // --- MIDI Patterns ---
+
+  async createMidiPattern(pattern: Omit<MidiPattern, 'id'>): Promise<MidiPattern> {
+    const full: MidiPattern = { id: generateId(), ...pattern };
+    await db.midiPatterns.add(full);
+    return full;
+  },
+
+  async getMidiPatterns(projectId: string): Promise<MidiPattern[]> {
+    return db.midiPatterns.where('projectId').equals(projectId).toArray();
+  },
+
+  async getMidiPattern(id: string): Promise<MidiPattern | undefined> {
+    return db.midiPatterns.get(id);
+  },
+
+  async updateMidiPattern(id: string, changes: Partial<Omit<MidiPattern, 'id'>>): Promise<void> {
+    await db.midiPatterns.update(id, changes);
+  },
+
+  async deleteMidiPattern(id: string): Promise<void> {
+    await db.midiPatterns.delete(id);
   },
 };

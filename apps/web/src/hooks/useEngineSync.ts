@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { AudioEngine, TrackNode, TempoMap } from '@staves/audio-engine';
-import type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit } from '@staves/audio-engine';
+import type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit, ScheduledMidiClip, ScheduledMidiNote } from '@staves/audio-engine';
 import { audioBlobStore } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
-import type { Clip, DrumPattern } from '@staves/storage';
+import type { Clip, DrumPattern, MidiPattern } from '@staves/storage';
 
 /**
  * Wires the project store to the AudioEngine:
@@ -30,21 +30,32 @@ export function useEngineSync() {
     const scheduledInSession = new Set<string>();
 
     // --- Clip scheduler: called by transport's look-ahead loop ---
-    engine.transport.setClipScheduler(({ clips, drumClips, fromBeat, toBeat, beatToContextTime }) => {
+    engine.transport.setClipScheduler(({ clips, drumClips, midiClips, fromBeat, toBeat, beatToContextTime }) => {
+      // Determine loop boundary for clamping durations
+      const loopEnd = engine.transport.loopEnabled && engine.transport.loopEnd > engine.transport.loopStart
+        ? engine.transport.loopEnd
+        : Infinity;
+
       // Schedule audio clips
       for (const clip of clips) {
         if (scheduledInSession.has(clip.clipId)) continue;
 
-        const clipEndBeat = clip.startBeat + clip.durationBeats;
+        const clipEndBeat = Math.min(clip.startBeat + clip.durationBeats, loopEnd);
 
         // Clip overlaps the current window or has already started
         if (clip.startBeat < toBeat && clipEndBeat > fromBeat) {
           const trackNode = trackNodes.get(clip.trackId);
           const destination = trackNode ? trackNode.input : engine.masterBus.input;
+          // Clamp duration to loop boundary
+          const effectiveDuration = clipEndBeat - clip.startBeat;
 
           if (clip.startBeat >= fromBeat) {
             // Clip starts in the future — schedule at its start beat
-            engine.clipPlayer.scheduleClip(clip, destination, beatToContextTime(clip.startBeat));
+            engine.clipPlayer.scheduleClip(
+              { ...clip, durationBeats: effectiveDuration },
+              destination,
+              beatToContextTime(clip.startBeat),
+            );
           } else {
             // Clip already started — play from partway through
             const skippedBeats = fromBeat - clip.startBeat;
@@ -52,7 +63,7 @@ export function useEngineSync() {
               {
                 ...clip,
                 offsetBeats: clip.offsetBeats + skippedBeats,
-                durationBeats: clip.durationBeats - skippedBeats,
+                durationBeats: effectiveDuration - skippedBeats,
               },
               destination,
               beatToContextTime(fromBeat),
@@ -68,6 +79,8 @@ export function useEngineSync() {
         if (dc.startBeat >= toBeat || clipEndBeat <= fromBeat) continue;
 
         for (const hit of dc.hits) {
+          // Skip hits that fall at or beyond the loop end
+          if (hit.beat >= loopEnd) continue;
           if (hit.beat >= fromBeat && hit.beat < toBeat) {
             const hitKey = `drum:${dc.clipId}:${hit.beat}:${hit.sampleKey}`;
             if (scheduledInSession.has(hitKey)) continue;
@@ -80,6 +93,37 @@ export function useEngineSync() {
               destination,
               beatToContextTime(hit.beat),
               hit.velocity,
+            );
+          }
+        }
+      }
+
+      // Schedule MIDI synth notes
+      for (const mc of midiClips) {
+        const clipEndBeat = mc.startBeat + mc.durationBeats;
+        if (mc.startBeat >= toBeat || clipEndBeat <= fromBeat) continue;
+
+        for (const note of mc.notes) {
+          // Skip notes that start at or beyond the loop end
+          if (note.beat >= loopEnd) continue;
+          if (note.beat >= fromBeat && note.beat < toBeat) {
+            const noteKey = `midi:${mc.clipId}:${note.beat}:${note.pitch}`;
+            if (scheduledInSession.has(noteKey)) continue;
+            scheduledInSession.add(noteKey);
+
+            const trackNode = trackNodes.get(mc.trackId);
+            const destination = trackNode ? trackNode.input : engine.masterBus.input;
+            const noteStartTime = beatToContextTime(note.beat);
+            // Clamp note end to both clip end and loop end
+            const noteEndBeat = Math.min(note.beat + note.durationBeats, clipEndBeat, loopEnd);
+            const durationSec = beatToContextTime(noteEndBeat) - noteStartTime;
+            engine.synth.scheduleNote(
+              note.pitch,
+              note.velocity,
+              noteStartTime,
+              durationSec,
+              mc.synthPatch,
+              destination,
             );
           }
         }
@@ -104,12 +148,20 @@ export function useEngineSync() {
     engine.transport.stop = () => {
       scheduledInSession.clear();
       engine.clipPlayer.stopAll();
+      engine.synth.releaseAll();
       originalStop();
     };
 
+    // On loop wrap, clear scheduled set so clips can be re-triggered
+    engine.transport.setOnLoopWrap(() => {
+      scheduledInSession.clear();
+      engine.clipPlayer.stopAll();
+      engine.synth.releaseAll();
+    });
+
     // --- Subscribe to store changes ---
     const unsub = useProjectStore.subscribe((state, prevState) => {
-      const { tracks, clips, drumPatterns, tempoEvents, timeSignatureEvents } = state;
+      const { tracks, clips, drumPatterns, midiPatterns, tempoEvents, timeSignatureEvents } = state;
 
       // Sync TempoMap to engine when tempo/timeSig events change
       if (tempoEvents !== prevState.tempoEvents || timeSignatureEvents !== prevState.timeSignatureEvents) {
@@ -139,16 +191,16 @@ export function useEngineSync() {
         node.muted = anySoloed ? !track.isSolo : track.isMuted;
       }
 
-      // Rebuild scheduled clips when clips or drum patterns change
-      if (clips !== prevState.clips || drumPatterns !== prevState.drumPatterns) {
-        rebuildClips(clips, drumPatterns);
+      // Rebuild scheduled clips when clips or patterns change
+      if (clips !== prevState.clips || drumPatterns !== prevState.drumPatterns || midiPatterns !== prevState.midiPatterns) {
+        rebuildClips(clips, drumPatterns, midiPatterns);
       }
     });
 
     // Initial clip build
-    const { clips: initialClips, drumPatterns: initialPatterns } = useProjectStore.getState();
-    if (initialClips.length > 0 || initialPatterns.length > 0) {
-      rebuildClips(initialClips, initialPatterns);
+    const { clips: initialClips, drumPatterns: initialPatterns, midiPatterns: initialMidiPatterns } = useProjectStore.getState();
+    if (initialClips.length > 0 || initialPatterns.length > 0 || initialMidiPatterns.length > 0) {
+      rebuildClips(initialClips, initialPatterns, initialMidiPatterns);
     }
 
     // Preload drum samples from initial patterns
@@ -164,11 +216,11 @@ export function useEngineSync() {
       }
     }
 
-    async function rebuildClips(clips: Clip[], drumPatterns: DrumPattern[]) {
+    async function rebuildClips(clips: Clip[], drumPatterns: DrumPattern[], midiPatterns: MidiPattern[]) {
       // Decode any new audio blobs (only for audio clips)
       const decodePromises: Promise<void>[] = [];
       for (const clip of clips) {
-        if (clip.drumPatternId) continue; // skip drum clips
+        if (clip.drumPatternId || clip.midiPatternId) continue; // skip drum/midi clips
         if (!clip.audioBlobId) continue;
         if (!engine.clipPlayer.getBuffer(clip.audioBlobId) && !decodingRef.current.has(clip.audioBlobId)) {
           decodingRef.current.add(clip.audioBlobId);
@@ -188,7 +240,7 @@ export function useEngineSync() {
       // Build ScheduledClip array (audio clips only)
       const scheduled: ScheduledClip[] = [];
       for (const clip of clips) {
-        if (clip.drumPatternId) continue;
+        if (clip.drumPatternId || clip.midiPatternId) continue;
         if (!clip.audioBlobId) continue;
         const buffer = engine.clipPlayer.getBuffer(clip.audioBlobId);
         if (!buffer) continue;
@@ -239,6 +291,36 @@ export function useEngineSync() {
         });
       }
       engine.transport.setDrumClips(scheduledDrum);
+
+      // Build ScheduledMidiClip array
+      const midiPatternMap = new Map(midiPatterns.map((p) => [p.id, p]));
+      const scheduledMidi: ScheduledMidiClip[] = [];
+
+      for (const clip of clips) {
+        if (!clip.midiPatternId) continue;
+        const pattern = midiPatternMap.get(clip.midiPatternId);
+        if (!pattern) continue;
+
+        const notes: ScheduledMidiNote[] = [];
+        for (const note of pattern.notes) {
+          notes.push({
+            beat: clip.startBeat + note.startBeat,
+            durationBeats: note.durationBeats,
+            pitch: note.pitch,
+            velocity: note.velocity,
+          });
+        }
+
+        scheduledMidi.push({
+          clipId: clip.id,
+          trackId: clip.trackId,
+          startBeat: clip.startBeat,
+          durationBeats: clip.durationBeats,
+          notes,
+          synthPatch: pattern.synthPatch,
+        });
+      }
+      engine.transport.setMidiClips(scheduledMidi);
     }
 
     return () => {
@@ -247,8 +329,10 @@ export function useEngineSync() {
       engine.transport.record = originalRecord;
       engine.transport.stop = originalStop;
       engine.transport.setClipScheduler(() => {});
+      engine.transport.setOnLoopWrap(null);
       engine.transport.setClips([]);
       engine.transport.setDrumClips([]);
+      engine.transport.setMidiClips([]);
       for (const [, node] of trackNodes) {
         node.disconnect();
       }

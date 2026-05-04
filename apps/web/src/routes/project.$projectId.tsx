@@ -1,6 +1,6 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useCallback, useState, useMemo } from 'react';
-import { AudioEngine, DEFAULT_DRUM_KIT } from '@staves/audio-engine';
+import { AudioEngine, DEFAULT_DRUM_KIT, DEFAULT_SYNTH_PATCH } from '@staves/audio-engine';
 import { projectRepository, audioBlobStore } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTransportStore } from '@/stores/transportStore';
@@ -25,6 +25,8 @@ import { MetronomeLane } from '@/components/timeline/MetronomeLane';
 import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
 import { StepSequencer } from '@/components/sequencer/StepSequencer';
+import { PianoRoll } from '@/components/pianoroll/PianoRoll';
+import { TrackDetailPanel } from '@/components/tracks/TrackDetailPanel';
 import { ClipContextMenu } from '@/components/timeline/ClipContextMenu';
 import { rootRoute } from './__root';
 
@@ -53,6 +55,9 @@ function DawEditorPage() {
   const drumPatterns = useProjectStore((s) => s.drumPatterns);
   const setDrumPatterns = useProjectStore((s) => s.setDrumPatterns);
   const addDrumPattern = useProjectStore((s) => s.addDrumPattern);
+  const midiPatterns = useProjectStore((s) => s.midiPatterns);
+  const setMidiPatterns = useProjectStore((s) => s.setMidiPatterns);
+  const addMidiPattern = useProjectStore((s) => s.addMidiPattern);
   const markers = useProjectStore((s) => s.markers);
   const setMarkers = useProjectStore((s) => s.setMarkers);
   const addMarker = useProjectStore((s) => s.addMarker);
@@ -65,6 +70,8 @@ function DawEditorPage() {
   const zoom = useUiStore((s) => s.zoom);
   const setZoom = useUiStore((s) => s.setZoom);
   const editingDrumClipId = useUiStore((s) => s.editingDrumClipId);
+  const editingMidiClipId = useUiStore((s) => s.editingMidiClipId);
+  const selectedTrackId = useUiStore((s) => s.selectedTrackId);
   const contextMenu = useUiStore((s) => s.contextMenu);
   const setContextMenu = useUiStore((s) => s.setContextMenu);
 
@@ -129,6 +136,8 @@ function DawEditorPage() {
         setClips(loadedClips);
         const loadedPatterns = await projectRepository.getDrumPatterns(projectId);
         setDrumPatterns(loadedPatterns);
+        const loadedMidiPatterns = await projectRepository.getMidiPatterns(projectId);
+        setMidiPatterns(loadedMidiPatterns);
         const loadedMarkers = await projectRepository.getMarkers(projectId);
         setMarkers(loadedMarkers);
       } else {
@@ -149,7 +158,7 @@ function DawEditorPage() {
     }
     load();
     return () => reset();
-  }, [projectId, navigate, setProject, setTracks, setClips, setDrumPatterns, setMarkers, setBpm, reset, roomId]);
+  }, [projectId, navigate, setProject, setTracks, setClips, setDrumPatterns, setMidiPatterns, setMarkers, setBpm, reset, roomId]);
 
   // --- Transport handlers ---
   const { play, stop } = useTransportHooks();
@@ -251,6 +260,44 @@ function DawEditorPage() {
     addClip(clip);
   }, [project, addTrack, addDrumPattern, addClip]);
 
+  const handleAddMidiTrack = useCallback(async () => {
+    if (!project) return;
+    const currentTracks = useProjectStore.getState().tracks;
+    const track = await projectRepository.createTrack(
+      project.id,
+      `Synth ${currentTracks.filter((t) => t.type === 'midi').length + 1}`,
+      'midi',
+    );
+    addTrack(track);
+
+    // Create a default empty MIDI pattern with 4 beats
+    const durationBeats = 4;
+    const pattern = await projectRepository.createMidiPattern({
+      projectId: project.id,
+      durationBeats,
+      notes: [],
+      synthPatch: DEFAULT_SYNTH_PATCH,
+    });
+    addMidiPattern(pattern);
+
+    // Create a clip at beat 0 referencing this pattern
+    const clip = await projectRepository.createClip({
+      trackId: track.id,
+      projectId: project.id,
+      audioBlobId: '',
+      name: 'MIDI 1',
+      startBeat: 0,
+      durationBeats,
+      offsetBeats: 0,
+      gainDb: 0,
+      fadeInBeats: 0,
+      fadeOutBeats: 0,
+      sourceDurationBeats: durationBeats,
+      midiPatternId: pattern.id,
+    });
+    addClip(clip);
+  }, [project, addTrack, addMidiPattern, addClip]);
+
   // --- Create drum clip on timeline double-click ---
   const handleCreateDrumClip = useCallback(async (trackId: string, startBeat: number) => {
     if (!project) return;
@@ -287,6 +334,37 @@ function DawEditorPage() {
     });
     addClip(clip);
   }, [project, addDrumPattern, addClip]);
+
+  // --- Create MIDI clip on timeline double-click ---
+  const handleCreateMidiClip = useCallback(async (trackId: string, startBeat: number) => {
+    if (!project) return;
+    const durationBeats = 4;
+    const pattern = await projectRepository.createMidiPattern({
+      projectId: project.id,
+      durationBeats,
+      notes: [],
+      synthPatch: DEFAULT_SYNTH_PATCH,
+    });
+    addMidiPattern(pattern);
+
+    const currentClips = useProjectStore.getState().clips;
+    const trackClipCount = currentClips.filter((c) => c.trackId === trackId && c.midiPatternId).length;
+    const clip = await projectRepository.createClip({
+      trackId,
+      projectId: project.id,
+      audioBlobId: '',
+      name: `MIDI ${trackClipCount + 1}`,
+      startBeat,
+      durationBeats,
+      offsetBeats: 0,
+      gainDb: 0,
+      fadeInBeats: 0,
+      fadeOutBeats: 0,
+      sourceDurationBeats: durationBeats,
+      midiPatternId: pattern.id,
+    });
+    addClip(clip);
+  }, [project, addMidiPattern, addClip]);
 
   // --- Drag-and-drop audio file import ---
   const handleDropAudioFile = useCallback(async (trackId: string, startBeat: number, file: File) => {
@@ -406,6 +484,7 @@ function DawEditorPage() {
 
     for (const clipData of clipboard) {
       let drumPatternId = clipData.drumPatternId;
+      let midiPatternId = clipData.midiPatternId;
 
       // If this is a drum clip, duplicate the drum pattern
       if (drumPatternId) {
@@ -424,6 +503,22 @@ function DawEditorPage() {
         }
       }
 
+      // If this is a MIDI clip, duplicate the MIDI pattern
+      if (midiPatternId) {
+        const currentMidiPatterns = useProjectStore.getState().midiPatterns;
+        const sourcePattern = currentMidiPatterns.find((p) => p.id === midiPatternId);
+        if (sourcePattern) {
+          const newPattern = await projectRepository.createMidiPattern({
+            projectId: project.id,
+            durationBeats: sourcePattern.durationBeats,
+            notes: sourcePattern.notes.map((n) => ({ ...n })),
+            synthPatch: JSON.parse(JSON.stringify(sourcePattern.synthPatch)),
+          });
+          addMidiPattern(newPattern);
+          midiPatternId = newPattern.id;
+        }
+      }
+
       const newClip = await projectRepository.createClip({
         trackId: clipData.trackId,
         projectId: project.id,
@@ -437,6 +532,7 @@ function DawEditorPage() {
         fadeOutBeats: clipData.fadeOutBeats ?? 0,
         sourceDurationBeats: clipData.sourceDurationBeats,
         ...(drumPatternId ? { drumPatternId } : {}),
+        ...(midiPatternId ? { midiPatternId } : {}),
       });
       addClip(newClip);
       newClipIds.push(newClip.id);
@@ -447,7 +543,7 @@ function DawEditorPage() {
     for (const id of newClipIds) {
       selectClip(id, true);
     }
-  }, [project, addClip, addDrumPattern, deselectAll, selectClip]);
+  }, [project, addClip, addDrumPattern, addMidiPattern, deselectAll, selectClip]);
 
   // --- Split clip at playhead (S key) ---
   const handleSplit = useCallback(async () => {
@@ -462,8 +558,8 @@ function DawEditorPage() {
       const end = clip.startBeat + clip.durationBeats;
       // Only split if the playhead is strictly within the clip's range
       if (splitBeat <= clip.startBeat || splitBeat >= end) continue;
-      // Skip drum clips
-      if (clip.drumPatternId) continue;
+      // Skip drum and MIDI clips
+      if (clip.drumPatternId || clip.midiPatternId) continue;
 
       const leftDur = splitBeat - clip.startBeat;
       const rightDur = clip.durationBeats - leftDur;
@@ -506,6 +602,7 @@ function DawEditorPage() {
 
     for (const clip of selected) {
       let dpId = clip.drumPatternId;
+      let mpId = clip.midiPatternId;
 
       // If this is a drum clip, duplicate the drum pattern too
       if (dpId) {
@@ -524,6 +621,22 @@ function DawEditorPage() {
         }
       }
 
+      // If this is a MIDI clip, duplicate the MIDI pattern too
+      if (mpId) {
+        const patterns = useProjectStore.getState().midiPatterns;
+        const src = patterns.find((p) => p.id === mpId);
+        if (src) {
+          const np = await projectRepository.createMidiPattern({
+            projectId: project.id,
+            durationBeats: src.durationBeats,
+            notes: src.notes.map((n) => ({ ...n })),
+            synthPatch: JSON.parse(JSON.stringify(src.synthPatch)),
+          });
+          addMidiPattern(np);
+          mpId = np.id;
+        }
+      }
+
       const dup = await projectRepository.createClip({
         trackId: clip.trackId,
         projectId: project.id,
@@ -537,6 +650,7 @@ function DawEditorPage() {
         fadeOutBeats: clip.fadeOutBeats,
         sourceDurationBeats: clip.sourceDurationBeats,
         ...(dpId ? { drumPatternId: dpId } : {}),
+        ...(mpId ? { midiPatternId: mpId } : {}),
       });
       addClip(dup);
       newIds.push(dup.id);
@@ -546,7 +660,30 @@ function DawEditorPage() {
       deselectAll();
       for (const id of newIds) selectClip(id, true);
     }
-  }, [project, addClip, addDrumPattern, deselectAll, selectClip]);
+  }, [project, addClip, addDrumPattern, addMidiPattern, deselectAll, selectClip]);
+
+  // --- Loop section (set loop region to selected clip bounds) ---
+  const handleLoopSection = useCallback(() => {
+    const ids = useUiStore.getState().selectedClipIds;
+    const allClips = useProjectStore.getState().clips;
+    const selected = allClips.filter((c) => ids.has(c.id));
+    if (selected.length === 0) return;
+
+    const start = Math.min(...selected.map((c) => c.startBeat));
+    const end = Math.max(...selected.map((c) => c.startBeat + c.durationBeats));
+
+    useTransportStore.getState().setLoopRegion(start, end);
+    useTransportStore.getState().setLoopEnabled(true);
+
+    try {
+      const engine = AudioEngine.getInstance();
+      engine.transport.loopStart = start;
+      engine.transport.loopEnd = end;
+      engine.transport.loopEnabled = true;
+    } catch {
+      // Engine not ready
+    }
+  }, []);
 
   // --- Zoom ---
   const handleZoomIn = useCallback(() => setZoom(zoom * 1.25), [zoom, setZoom]);
@@ -573,8 +710,9 @@ function DawEditorPage() {
       onSplit: handleSplit,
       onDuplicate: handleDuplicate,
       onAddMarker: handleAddMarker,
+      onLoopSection: handleLoopSection,
     }),
-    [play, stop, isPlaying, handleRecord, handleStopRecord, isRecording, undo, redo, handleDeleteSelected, handleSelectAll, deselectAll, handleZoomIn, handleZoomOut, handleCopy, handlePaste, handleSplit, handleDuplicate, handleAddMarker],
+    [play, stop, isPlaying, handleRecord, handleStopRecord, isRecording, undo, redo, handleDeleteSelected, handleSelectAll, deselectAll, handleZoomIn, handleZoomOut, handleCopy, handlePaste, handleSplit, handleDuplicate, handleAddMarker, handleLoopSection],
   );
   useKeyboardShortcuts(shortcutHandlers);
 
@@ -600,20 +738,49 @@ function DawEditorPage() {
             onNavigateHome={() => navigate({ to: '/' })}
           />
         }
-        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
+        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} onAddMidiTrack={handleAddMidiTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
         metronomeTrack={<MetronomeTrack />}
         metronomeLane={<MetronomeLane />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         masterLane={<MasterLane />}
-        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onDropAudioFile={handleDropAudioFile} />}
+        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onCreateMidiClip={handleCreateMidiClip} onDropAudioFile={handleDropAudioFile} />}
         bottomPanel={(() => {
-          if (!editingDrumClipId) return undefined;
-          const editClip = clips.find((c) => c.id === editingDrumClipId);
-          const editPattern = editClip?.drumPatternId
-            ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
-            : undefined;
-          if (!editClip || !editPattern) return undefined;
-          return <StepSequencer clip={editClip} pattern={editPattern} />;
+          // Piano roll takes priority when editing a MIDI clip
+          if (editingMidiClipId) {
+            const editClip = clips.find((c) => c.id === editingMidiClipId);
+            const editPattern = editClip?.midiPatternId
+              ? midiPatterns.find((p) => p.id === editClip.midiPatternId)
+              : undefined;
+            if (editClip && editPattern) {
+              return <PianoRoll clip={editClip} pattern={editPattern} />;
+            }
+          }
+          // Step sequencer when editing a drum clip
+          if (editingDrumClipId) {
+            const editClip = clips.find((c) => c.id === editingDrumClipId);
+            const editPattern = editClip?.drumPatternId
+              ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
+              : undefined;
+            if (editClip && editPattern) {
+              return <StepSequencer clip={editClip} pattern={editPattern} />;
+            }
+          }
+          // Track detail panel when a track is selected
+          if (selectedTrackId) {
+            const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
+            if (selectedTrack) {
+              const trackClips = clips.filter((c) => c.trackId === selectedTrackId);
+              return (
+                <TrackDetailPanel
+                  track={selectedTrack}
+                  trackClips={trackClips}
+                  drumPatterns={drumPatterns}
+                  midiPatterns={midiPatterns}
+                />
+              );
+            }
+          }
+          return undefined;
         })()}
         connectionStatus={connectionStatus}
         peerCount={peerCount}
@@ -653,6 +820,7 @@ function DawEditorPage() {
             { label: 'Paste', shortcut: '\u2318V', onClick: handlePaste, disabled: useUiStore.getState().clipboard.length === 0 },
             { label: 'Duplicate', shortcut: '\u2318D', onClick: handleDuplicate },
             { label: 'Split at Playhead', shortcut: 'S', onClick: handleSplit },
+            { label: 'Loop Section', shortcut: '\u2318L', onClick: handleLoopSection },
             { label: 'Delete', shortcut: '\u232B', onClick: handleDeleteSelected, danger: true },
           ]}
         />

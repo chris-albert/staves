@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AudioEngine, DEFAULT_DRUM_KIT } from '@staves/audio-engine';
+import { AudioEngine, DRUM_KIT_BANKS } from '@staves/audio-engine';
 import type { DrumPattern, Clip } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -327,21 +327,28 @@ function PadConfig({ pad, onPreview, onChangeSample }: PadConfigProps) {
             className="absolute left-0 bottom-full z-50 mb-1 max-h-48 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-800 shadow-xl"
             style={{ minWidth: 160 }}
           >
-            {DEFAULT_DRUM_KIT.map((sound) => (
-              <button
-                key={sound.url}
-                onClick={() => {
-                  onChangeSample(pad.index, sound.url, sound.name);
-                  setShowSampleMenu(false);
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
-                  sound.url === pad.sampleUrl
-                    ? 'bg-zinc-700 text-zinc-100'
-                    : 'text-zinc-300 hover:bg-zinc-700'
-                }`}
-              >
-                {sound.name}
-              </button>
+            {DRUM_KIT_BANKS.map((bank) => (
+              <div key={bank.id}>
+                <div className="px-3 py-1 text-[9px] font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-850 sticky top-0">
+                  {bank.name}
+                </div>
+                {bank.sounds.map((sound) => (
+                  <button
+                    key={sound.url}
+                    onClick={() => {
+                      onChangeSample(pad.index, sound.url, sound.name);
+                      setShowSampleMenu(false);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+                      sound.url === pad.sampleUrl
+                        ? 'bg-zinc-700 text-zinc-100'
+                        : 'text-zinc-300 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {sound.name}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         )}

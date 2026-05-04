@@ -4,6 +4,7 @@ import { TempoMap } from './TempoMap';
 import { Metronome } from './Metronome';
 import { ClipPlayer } from './ClipPlayer';
 import { DrumSampler } from './DrumSampler';
+import { Synth } from './Synth';
 
 export class AudioEngine {
   private static instance: AudioEngine | null = null;
@@ -15,6 +16,7 @@ export class AudioEngine {
   readonly metronome: Metronome;
   readonly clipPlayer: ClipPlayer;
   readonly drumSampler: DrumSampler;
+  readonly synth: Synth;
 
   private constructor() {
     this.context = new AudioContext({ sampleRate: 48000 });
@@ -23,6 +25,7 @@ export class AudioEngine {
     this.metronome = new Metronome(this.context, this.masterBus.input);
     this.clipPlayer = new ClipPlayer(this.context, this.tempoMap);
     this.drumSampler = new DrumSampler(this.context);
+    this.synth = new Synth(this.context);
     this.transport = new Transport(this.context, this.tempoMap, this.metronome);
   }
 
@@ -60,6 +63,7 @@ export class AudioEngine {
 
   destroy(): void {
     this.transport.stop();
+    this.synth.releaseAll();
     this.clipPlayer.stopAll();
     this.clipPlayer.clearCache();
     this.drumSampler.clearCache();
