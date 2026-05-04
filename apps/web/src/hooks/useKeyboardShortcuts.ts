@@ -19,6 +19,7 @@ interface ShortcutHandlers {
   onSplit: () => void;
   onDuplicate: () => void;
   onAddMarker: () => void;
+  onLoopSection: () => void;
 }
 
 /**
@@ -35,6 +36,7 @@ interface ShortcutHandlers {
  * Cmd/Ctrl+-  — zoom out
  * S           — split selected clips at playhead
  * Cmd/Ctrl+D  — duplicate selected clips
+ * Cmd/Ctrl+L  — loop selected clips (set loop region)
  * M           — add marker at playhead
  * Escape      — deselect all
  */
@@ -135,6 +137,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           if (mod) {
             e.preventDefault();
             handlers.onDuplicate();
+          }
+          break;
+
+        case 'KeyL':
+          if (mod) {
+            e.preventDefault();
+            handlers.onLoopSection();
           }
           break;
 

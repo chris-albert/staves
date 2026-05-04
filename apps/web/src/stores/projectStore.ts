@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData, DrumPattern, Marker } from '@staves/storage';
+import type { Project, Track, Clip, TempoEventData, TimeSignatureEventData, DrumPattern, MidiPattern, Marker } from '@staves/storage';
 
 interface ProjectState {
   project: Project | null;
@@ -8,6 +8,7 @@ interface ProjectState {
   tempoEvents: TempoEventData[];
   timeSignatureEvents: TimeSignatureEventData[];
   drumPatterns: DrumPattern[];
+  midiPatterns: MidiPattern[];
   markers: Marker[];
 }
 
@@ -34,6 +35,10 @@ interface ProjectActions {
   addDrumPattern: (pattern: DrumPattern) => void;
   updateDrumPattern: (id: string, changes: Partial<DrumPattern>) => void;
   removeDrumPattern: (id: string) => void;
+  setMidiPatterns: (patterns: MidiPattern[]) => void;
+  addMidiPattern: (pattern: MidiPattern) => void;
+  updateMidiPattern: (id: string, changes: Partial<MidiPattern>) => void;
+  removeMidiPattern: (id: string) => void;
   setMarkers: (markers: Marker[]) => void;
   addMarker: (marker: Marker) => void;
   updateMarker: (id: string, changes: Partial<Marker>) => void;
@@ -55,6 +60,7 @@ const initialState: ProjectState = {
   tempoEvents: defaultTempoEvents,
   timeSignatureEvents: defaultTimeSigEvents,
   drumPatterns: [],
+  midiPatterns: [],
   markers: [],
 };
 
@@ -154,6 +160,20 @@ export const useProjectStore = create<ProjectState & ProjectActions>()((set) => 
 
   removeDrumPattern: (id) =>
     set((s) => ({ drumPatterns: s.drumPatterns.filter((p) => p.id !== id) })),
+
+  // MIDI patterns
+  setMidiPatterns: (midiPatterns) => set({ midiPatterns }),
+
+  addMidiPattern: (pattern) =>
+    set((s) => ({ midiPatterns: [...s.midiPatterns, pattern] })),
+
+  updateMidiPattern: (id, changes) =>
+    set((s) => ({
+      midiPatterns: s.midiPatterns.map((p) => (p.id === id ? { ...p, ...changes } : p)),
+    })),
+
+  removeMidiPattern: (id) =>
+    set((s) => ({ midiPatterns: s.midiPatterns.filter((p) => p.id !== id) })),
 
   // Markers
   setMarkers: (markers) => set({ markers }),

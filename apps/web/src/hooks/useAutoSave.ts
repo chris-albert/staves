@@ -21,14 +21,15 @@ export function useAutoSave() {
       const tempoChanged = state.tempoEvents !== prev.tempoEvents;
       const timeSigChanged = state.timeSignatureEvents !== prev.timeSignatureEvents;
       const drumPatternsChanged = state.drumPatterns !== prev.drumPatterns;
+      const midiPatternsChanged = state.midiPatterns !== prev.midiPatterns;
       const markersChanged = state.markers !== prev.markers;
 
-      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged && !drumPatternsChanged && !markersChanged) return;
+      if (!projectChanged && !tracksChanged && !clipsChanged && !tempoChanged && !timeSigChanged && !drumPatternsChanged && !midiPatternsChanged && !markersChanged) return;
 
       if (timerRef.current) clearTimeout(timerRef.current);
 
       timerRef.current = setTimeout(async () => {
-        const { project, tracks, clips, tempoEvents, timeSignatureEvents, drumPatterns, markers } = useProjectStore.getState();
+        const { project, tracks, clips, tempoEvents, timeSignatureEvents, drumPatterns, midiPatterns, markers } = useProjectStore.getState();
         if (!project) return;
 
         try {
@@ -71,6 +72,14 @@ export function useAutoSave() {
               stepsPerBeat: pattern.stepsPerBeat,
               activeSteps: pattern.activeSteps,
               pads: pattern.pads,
+            });
+          }
+
+          for (const pattern of midiPatterns) {
+            await projectRepository.updateMidiPattern(pattern.id, {
+              durationBeats: pattern.durationBeats,
+              notes: pattern.notes,
+              synthPatch: pattern.synthPatch,
             });
           }
 

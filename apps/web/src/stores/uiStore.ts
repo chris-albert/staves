@@ -24,6 +24,7 @@ interface UiState {
   snapEnabled: boolean;
   snapDivision: number; // beats (e.g. 1 = snap to beat, 0.25 = snap to 16th)
   editingDrumClipId: string | null;
+  editingMidiClipId: string | null;
   clipboard: Clip[];
   contextMenu: { x: number; y: number; clipId: string } | null;
 }
@@ -40,6 +41,7 @@ interface UiActions {
   setSnapEnabled: (enabled: boolean) => void;
   setSnapDivision: (division: number) => void;
   setEditingDrumClipId: (id: string | null) => void;
+  setEditingMidiClipId: (id: string | null) => void;
   setClipboard: (clips: Clip[]) => void;
   setContextMenu: (menu: UiState['contextMenu']) => void;
 }
@@ -55,6 +57,7 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   snapEnabled: true,
   snapDivision: 1,
   editingDrumClipId: null,
+  editingMidiClipId: null,
   clipboard: [],
   contextMenu: null,
 
@@ -80,6 +83,7 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
   setSnapDivision: (snapDivision) => set({ snapDivision }),
   setEditingDrumClipId: (editingDrumClipId) => set({ editingDrumClipId }),
+  setEditingMidiClipId: (editingMidiClipId) => set({ editingMidiClipId }),
   setClipboard: (clipboard) => set({ clipboard }),
   setContextMenu: (contextMenu) => set({ contextMenu }),
 }));

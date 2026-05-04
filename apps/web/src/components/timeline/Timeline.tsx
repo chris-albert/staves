@@ -18,13 +18,15 @@ interface TimelineProps {
   onScrollTop?: (px: number) => void;
   scrollTopExternal?: number;
   onCreateDrumClip?: (trackId: string, startBeat: number) => void;
+  onCreateMidiClip?: (trackId: string, startBeat: number) => void;
   onDropAudioFile?: (trackId: string, startBeat: number, file: File) => void;
 }
 
-export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onDropAudioFile }: TimelineProps) {
+export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onCreateMidiClip, onDropAudioFile }: TimelineProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const clips = useProjectStore((s) => s.clips);
   const drumPatterns = useProjectStore((s) => s.drumPatterns);
+  const midiPatterns = useProjectStore((s) => s.midiPatterns);
   const zoom = useUiStore((s) => s.zoom);
   const scrollLeft = useUiStore((s) => s.scrollLeft);
   const setZoom = useUiStore((s) => s.setZoom);
@@ -107,7 +109,6 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onD
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (!onCreateDrumClip) return;
       const target = e.target as HTMLElement;
       if (target.closest('[data-clip]')) return;
       if (!trackAreaRef.current) return;
@@ -120,13 +121,18 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onD
       if (trackIndex < 0 || trackIndex >= tracks.length) return;
 
       const track = tracks[trackIndex];
-      if (!track || track.type !== 'drum') return;
+      if (!track) return;
 
       const beat = Math.max(0, x / zoom);
       const snappedBeat = snapEnabled ? snapToGrid(beat, snapDivision) : Math.floor(beat);
-      onCreateDrumClip(track.id, snappedBeat);
+
+      if (track.type === 'drum' && onCreateDrumClip) {
+        onCreateDrumClip(track.id, snappedBeat);
+      } else if (track.type === 'midi' && onCreateMidiClip) {
+        onCreateMidiClip(track.id, snappedBeat);
+      }
     },
-    [onCreateDrumClip, scrollLeft, zoom, tracks, snapEnabled, snapDivision],
+    [onCreateDrumClip, onCreateMidiClip, scrollLeft, zoom, tracks, snapEnabled, snapDivision],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -204,6 +210,7 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onD
               track={track}
               clips={trackClips}
               drumPatterns={drumPatterns}
+              midiPatterns={midiPatterns}
               zoom={zoom}
               scrollLeft={scrollLeft}
               top={i * trackHeight}

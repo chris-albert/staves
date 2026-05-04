@@ -1,4 +1,4 @@
-import { db, type Project, type Track, type Clip, type AudioBlob, type DrumPattern } from './db';
+import { db, type Project, type Track, type Clip, type AudioBlob, type DrumPattern, type MidiPattern } from './db';
 import { unzipSync, strFromU8 } from 'fflate';
 
 interface Manifest {
@@ -8,6 +8,7 @@ interface Manifest {
   clips: Clip[];
   audioBlobs: Omit<AudioBlob, 'data'>[];
   drumPatterns?: DrumPattern[];
+  midiPatterns?: MidiPattern[];
 }
 
 /** Import a .staves ZIP file into IndexedDB. */
@@ -24,7 +25,7 @@ export async function importProject(file: Blob): Promise<string> {
     throw new Error(`Unsupported .staves version: ${manifest.version}`);
   }
 
-  await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.drumPatterns], async () => {
+  await db.transaction('rw', [db.projects, db.tracks, db.clips, db.audioBlobs, db.drumPatterns, db.midiPatterns], async () => {
     await db.projects.put(manifest.project);
 
     for (const track of manifest.tracks) {
@@ -51,6 +52,12 @@ export async function importProject(file: Blob): Promise<string> {
     if (manifest.drumPatterns) {
       for (const pattern of manifest.drumPatterns) {
         await db.drumPatterns.put(pattern);
+      }
+    }
+
+    if (manifest.midiPatterns) {
+      for (const pattern of manifest.midiPatterns) {
+        await db.midiPatterns.put(pattern);
       }
     }
   });
