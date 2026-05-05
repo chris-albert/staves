@@ -2,8 +2,10 @@
   "name": "staves",
   "private": true,
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=!@staves/desktop",
+    "dev:desktop": "turbo dev --filter=@staves/desktop",
     "build": "turbo build",
+    "build:desktop": "turbo build --filter=@staves/desktop",
     "test": "turbo test",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck"

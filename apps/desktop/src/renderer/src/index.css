@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@source "../../../../../apps/web/src";
+@source "../../../../../packages/ui/src";
+
+/* macOS traffic light buttons inset */
+:root {
+  --titlebar-height: 38px;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Push app content below the native title bar area */
+#root > div {
+  padding-top: var(--titlebar-height);
+}
+
+/* Draggable title bar region across the top of the window */
+body::before {
+  content: '';
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-height);
+  -webkit-app-region: drag;
+  z-index: 9999;
+  pointer-events: auto;
+}
+
+/* Make interactive elements within the title bar area non-draggable */
+button, input, select, a, [role="button"], [role="slider"],
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
