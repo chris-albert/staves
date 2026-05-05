@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../web/src/*"]
+    }
+  },
+  "include": [
+    "src/renderer",
+    "src/preload/types.d.ts"
+  ]
+}

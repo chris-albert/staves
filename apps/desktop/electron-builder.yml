@@ -1,0 +1,21 @@
+appId: com.staves.app
+productName: Staves
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**/*
+  - resources/**/*
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.music
+  hardenedRuntime: true
+  gatekeeperAssess: false
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
