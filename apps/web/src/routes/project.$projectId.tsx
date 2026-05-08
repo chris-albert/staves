@@ -14,6 +14,7 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAudioDevices } from '@/hooks/useAudioDevices';
+import { useMidiInput } from '@/hooks/useMidiInput';
 import { useTrackLevels } from '@/hooks/useTrackLevels';
 import { AppShell } from '@/components/layout/AppShell';
 import { Toolbar } from '@/components/layout/Toolbar';
@@ -97,6 +98,7 @@ function DawEditorPage() {
   usePlayheadPosition();
   useAutoSave();
   const { trackNodesRef } = useEngineSync();
+  const { midiSupported, midiInputs, selectedMidiInputId, selectMidiInput } = useMidiInput(trackNodesRef);
   const trackLevels = useTrackLevels(trackNodesRef);
   const { undo, redo } = useUndoRedo(getProvider);
   const { startRecording, stopRecording, level: recordingLevel } = useRecorder();
@@ -800,6 +802,10 @@ function DawEditorPage() {
         onSelectOutput={selectOutput}
         permissionGranted={permissionGranted}
         onRequestPermission={requestPermission}
+        midiInputs={midiInputs}
+        selectedMidiInputId={selectedMidiInputId}
+        onSelectMidiInput={selectMidiInput}
+        midiSupported={midiSupported}
         currentRoomId={roomId}
         onCreateSession={handleCreateSession}
         onJoinSession={handleJoinSession}

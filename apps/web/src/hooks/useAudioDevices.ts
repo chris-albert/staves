@@ -62,6 +62,12 @@ export function useAudioDevices() {
   // Request mic permission to get device labels, then enumerate
   const requestPermission = useCallback(async () => {
     try {
+      // In Electron, trigger the macOS system permission dialog via IPC first
+      const staves = (window as unknown as { staves?: { invoke: (ch: string) => Promise<unknown> } }).staves;
+      if (staves) {
+        await staves.invoke('audio:request-mic-permission');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
       setPermissionGranted(true);
