@@ -14,6 +14,8 @@ const SEND_CHANNELS = ['app:minimize', 'app:maximize', 'app:close'];
 const INVOKE_CHANNELS = [
   'audio:get-devices',
   'audio:set-sample-rate',
+  'audio:request-mic-permission',
+  'audio:get-mic-status',
   'dialog:save-file',
   'dialog:open-file',
 ];

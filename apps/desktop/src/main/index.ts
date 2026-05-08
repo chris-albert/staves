@@ -1,5 +1,7 @@
-import { app, BrowserWindow, shell, session, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, session, systemPreferences, nativeImage } from 'electron';
 import { join } from 'path';
+import fs from 'fs';
+import path from 'path';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 
 // Set the app name early so macOS menu bar and dock show "Staves"
@@ -68,6 +70,47 @@ function createWindow(): BrowserWindow {
 
   return mainWindow;
 }
+
+// ─── IPC Handlers ────────────────────────────────────────────────────────
+
+// Native save dialog — writes binary data to a user-chosen file
+ipcMain.handle('dialog:save-file', async (_event, { data, defaultName, filters }) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: defaultName,
+    filters,
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  await fs.promises.writeFile(result.filePath, Buffer.from(data));
+  return { canceled: false, filePath: result.filePath };
+});
+
+// Native open dialog — reads a file chosen by the user
+ipcMain.handle('dialog:open-file', async (_event, { filters }) => {
+  const result = await dialog.showOpenDialog({
+    filters,
+    properties: ['openFile'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { canceled: true };
+  const data = await fs.promises.readFile(result.filePaths[0]!);
+  return { canceled: false, data: data.buffer, name: path.basename(result.filePaths[0]!) };
+});
+
+// macOS microphone permission
+ipcMain.handle('audio:request-mic-permission', async () => {
+  if (process.platform === 'darwin') {
+    return await systemPreferences.askForMediaAccess('microphone');
+  }
+  return true;
+});
+
+ipcMain.handle('audio:get-mic-status', () => {
+  if (process.platform === 'darwin') {
+    return systemPreferences.getMediaAccessStatus('microphone');
+  }
+  return 'granted';
+});
+
+// ─── App Lifecycle ───────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.staves.app');

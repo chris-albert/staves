@@ -20,6 +20,11 @@ interface PreferencesWindowProps {
   onSelectOutput: (deviceId: string) => void;
   permissionGranted: boolean;
   onRequestPermission: () => void;
+  // MIDI
+  midiInputs: { id: string; name: string }[];
+  selectedMidiInputId: string;
+  onSelectMidiInput: (id: string) => void;
+  midiSupported: boolean;
   // Collaborate
   currentRoomId: string | null;
   onCreateSession: () => void;
@@ -120,9 +125,20 @@ export function PreferencesWindow(props: PreferencesWindowProps) {
 
 // ─── Audio Tab ──────────────────────────────────────────────────────────
 
+interface StavesAPI {
+  invoke(channel: string, ...args: unknown[]): Promise<unknown>;
+}
+
+function getStavesAPI(): StavesAPI | undefined {
+  return (window as unknown as { staves?: StavesAPI }).staves;
+}
+
+const isElectron = typeof window !== 'undefined' && !!getStavesAPI();
+
 function AudioTab({
   inputs, outputs, selectedInputId, selectedOutputId,
   onSelectInput, onSelectOutput, permissionGranted, onRequestPermission,
+  midiInputs, selectedMidiInputId, onSelectMidiInput, midiSupported,
 }: PreferencesWindowProps) {
   useEffect(() => {
     if (!selectedOutputId) return;
@@ -136,11 +152,26 @@ function AudioTab({
     <div className="flex flex-col gap-8">
       <SectionHeader title="Audio" description="Configure your input and output devices." />
 
-      {!permissionGranted && (
+      {!permissionGranted && !isElectron && (
         <div className="flex items-center gap-4 rounded-lg border border-amber-900/50 bg-amber-950/30 px-4 py-3">
           <div className="flex-1">
             <p className="text-sm font-medium text-amber-200">Microphone access required</p>
             <p className="mt-0.5 text-xs text-amber-200/60">Grant access to see device names and enable recording.</p>
+          </div>
+          <button
+            onClick={onRequestPermission}
+            className="flex-shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 transition-colors"
+          >
+            Allow Access
+          </button>
+        </div>
+      )}
+
+      {!permissionGranted && isElectron && (
+        <div className="flex items-center gap-4 rounded-lg border border-amber-900/50 bg-amber-950/30 px-4 py-3">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-200">Microphone access required</p>
+            <p className="mt-0.5 text-xs text-amber-200/60">Grant microphone access to see device names and enable recording.</p>
           </div>
           <button
             onClick={onRequestPermission}
@@ -167,6 +198,19 @@ function AudioTab({
           onChange={onSelectOutput}
           emptyLabel="No output devices found"
         />
+      </SettingsRow>
+
+      <SettingsRow label="MIDI Input" description="External MIDI controller">
+        {!midiSupported ? (
+          <span className="text-xs text-zinc-600">MIDI not supported</span>
+        ) : (
+          <MidiDeviceSelect
+            devices={midiInputs}
+            value={selectedMidiInputId}
+            onChange={onSelectMidiInput}
+            emptyLabel="No MIDI devices found"
+          />
+        )}
       </SettingsRow>
 
       <SettingsRow label="Sample Rate" description="Audio engine sample rate">
@@ -390,14 +434,30 @@ function FileTab({ projectId, projectName, onImported, onClose }: PreferencesWin
         masterVolume: engine.masterBus.volume,
       });
 
-      const url = URL.createObjectURL(wavBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${projectName || 'project'}.wav`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setStatus('WAV exported!');
-      setTimeout(() => setStatus(null), 3000);
+      const staves = getStavesAPI();
+      if (isElectron && staves) {
+        const arrayBuffer = await wavBlob.arrayBuffer();
+        const result = await staves.invoke('dialog:save-file', {
+          data: arrayBuffer,
+          defaultName: `${projectName || 'project'}.wav`,
+          filters: [{ name: 'WAV Audio', extensions: ['wav'] }],
+        }) as { canceled: boolean };
+        if (!result.canceled) {
+          setStatus('WAV exported!');
+          setTimeout(() => setStatus(null), 3000);
+        } else {
+          setStatus(null);
+        }
+      } else {
+        const url = URL.createObjectURL(wavBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectName || 'project'}.wav`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus('WAV exported!');
+        setTimeout(() => setStatus(null), 3000);
+      }
     } catch (e) {
       setStatus(`WAV export failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
@@ -408,14 +468,31 @@ function FileTab({ projectId, projectName, onImported, onClose }: PreferencesWin
     try {
       setStatus('Exporting...');
       const blob = await exportProject(projectId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${projectName || 'project'}.staves`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setStatus('Exported successfully');
-      setTimeout(() => setStatus(null), 3000);
+
+      const staves = getStavesAPI();
+      if (isElectron && staves) {
+        const arrayBuffer = await blob.arrayBuffer();
+        const result = await staves.invoke('dialog:save-file', {
+          data: arrayBuffer,
+          defaultName: `${projectName || 'project'}.staves`,
+          filters: [{ name: 'Staves Project', extensions: ['staves'] }],
+        }) as { canceled: boolean };
+        if (!result.canceled) {
+          setStatus('Exported successfully');
+          setTimeout(() => setStatus(null), 3000);
+        } else {
+          setStatus(null);
+        }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectName || 'project'}.staves`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus('Exported successfully');
+        setTimeout(() => setStatus(null), 3000);
+      }
     } catch (e) {
       setStatus(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
@@ -471,7 +548,20 @@ function FileTab({ projectId, projectName, onImported, onClose }: PreferencesWin
           }}
         />
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={async () => {
+            const staves = getStavesAPI();
+            if (isElectron && staves) {
+              const result = await staves.invoke('dialog:open-file', {
+                filters: [{ name: 'Staves Project', extensions: ['staves'] }],
+              }) as { canceled: boolean; data?: ArrayBuffer; name?: string };
+              if (!result.canceled && result.data && result.name) {
+                const file = new File([result.data], result.name);
+                handleImport(file);
+              }
+            } else {
+              fileInputRef.current?.click();
+            }
+          }}
           className="rounded-md bg-zinc-800 px-3.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
         >
           Choose File
@@ -575,6 +665,71 @@ function DeviceSelect({
               label={d.label}
               selected={d.deviceId === value}
               onClick={() => handleSelect(d.deviceId)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MidiDeviceSelect({
+  devices, value, onChange, emptyLabel,
+}: {
+  devices: { id: string; name: string }[];
+  value: string;
+  onChange: (id: string) => void;
+  emptyLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selected = devices.find((d) => d.id === value);
+  const displayLabel = selected?.name ?? 'None';
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('pointerdown', handleClick);
+    return () => document.removeEventListener('pointerdown', handleClick);
+  }, [open]);
+
+  const handleSelect = useCallback((id: string) => {
+    onChange(id);
+    setOpen(false);
+  }, [onChange]);
+
+  if (devices.length === 0) {
+    return <span className="text-xs text-zinc-600">{emptyLabel}</span>;
+  }
+
+  return (
+    <div ref={ref} className="relative w-56">
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex w-full items-center justify-between gap-2 rounded-md bg-zinc-800 px-2.5 py-1.5 text-left text-xs ring-1 transition-colors ${
+          open ? 'ring-zinc-500 text-zinc-100' : 'ring-zinc-700 text-zinc-300 hover:ring-zinc-600'
+        }`}
+      >
+        <span className="truncate">{displayLabel}</span>
+        <svg
+          width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+          className={`flex-shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          <path d="M2 3.5L5 6.5L8 3.5" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-800 py-0.5 shadow-xl">
+          {devices.map((d) => (
+            <DropdownItem
+              key={d.id}
+              label={d.name}
+              selected={d.id === value}
+              onClick={() => handleSelect(d.id)}
             />
           ))}
         </div>
