@@ -125,7 +125,7 @@ function DawEditorPage() {
     async function load() {
       const p = await projectRepository.getProject(projectId);
       if (!p && !isJoining) {
-        navigate({ to: '/' });
+        navigate({ to: '/projects' });
         return;
       }
 
@@ -737,7 +737,7 @@ function DawEditorPage() {
             onRecord={handleRecord}
             onStopRecord={handleStopRecord}
             onOpenPreferences={() => setPrefsOpen(true)}
-            onNavigateHome={() => navigate({ to: '/' })}
+            onNavigateHome={() => navigate({ to: '/projects' })}
           />
         }
         trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} onAddMidiTrack={handleAddMidiTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
@@ -747,26 +747,6 @@ function DawEditorPage() {
         masterLane={<MasterLane />}
         timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onCreateMidiClip={handleCreateMidiClip} onDropAudioFile={handleDropAudioFile} />}
         bottomPanel={(() => {
-          // Piano roll takes priority when editing a MIDI clip
-          if (editingMidiClipId) {
-            const editClip = clips.find((c) => c.id === editingMidiClipId);
-            const editPattern = editClip?.midiPatternId
-              ? midiPatterns.find((p) => p.id === editClip.midiPatternId)
-              : undefined;
-            if (editClip && editPattern) {
-              return <PianoRoll clip={editClip} pattern={editPattern} />;
-            }
-          }
-          // Step sequencer when editing a drum clip
-          if (editingDrumClipId) {
-            const editClip = clips.find((c) => c.id === editingDrumClipId);
-            const editPattern = editClip?.drumPatternId
-              ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
-              : undefined;
-            if (editClip && editPattern) {
-              return <StepSequencer clip={editClip} pattern={editPattern} />;
-            }
-          }
           // Track detail panel when a track is selected
           if (selectedTrackId) {
             const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
@@ -789,6 +769,32 @@ function DawEditorPage() {
         roomId={roomId}
         onShareRoom={handleShareRoom}
       />
+
+      {/* Floating editor modals */}
+      {(() => {
+        if (editingMidiClipId) {
+          const editClip = clips.find((c) => c.id === editingMidiClipId);
+          const editPattern = editClip?.midiPatternId
+            ? midiPatterns.find((p) => p.id === editClip.midiPatternId)
+            : undefined;
+          if (editClip && editPattern) {
+            return <PianoRoll clip={editClip} pattern={editPattern} />;
+          }
+        }
+        return null;
+      })()}
+      {(() => {
+        if (editingDrumClipId) {
+          const editClip = clips.find((c) => c.id === editingDrumClipId);
+          const editPattern = editClip?.drumPatternId
+            ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
+            : undefined;
+          if (editClip && editPattern) {
+            return <StepSequencer clip={editClip} pattern={editPattern} />;
+          }
+        }
+        return null;
+      })()}
 
       <PreferencesWindow
         open={prefsOpen}
