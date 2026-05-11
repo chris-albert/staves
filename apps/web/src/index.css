@@ -2,7 +2,6 @@
 
 html, body, #root {
   height: 100%;
-  overflow: hidden;
 }
 
 /* Hide scrollbars but keep scrolling */

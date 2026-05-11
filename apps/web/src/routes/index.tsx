@@ -1,13 +1,13 @@
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';
-import { ProjectList } from '@/components/projects/ProjectList';
+import { LandingPage } from '@/components/landing/LandingPage';
 
 export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: ProjectListPage,
+  component: LandingPageRoute,
 });
 
-function ProjectListPage() {
-  return <ProjectList />;
+function LandingPageRoute() {
+  return <LandingPage />;
 }

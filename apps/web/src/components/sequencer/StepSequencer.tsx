@@ -4,6 +4,7 @@ import type { DrumPattern, Clip } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTransportStore } from '@/stores/transportStore';
+import { DraggablePanel } from '@/components/layout/DraggablePanel';
 
 const STEP_OPTIONS = [8, 16, 32] as const;
 const SPB_OPTIONS = [
@@ -13,7 +14,10 @@ const SPB_OPTIONS = [
   { label: '1/32', value: 8 },
 ] as const;
 
-const PANEL_HEIGHT = 340;
+const ROW_HEIGHT = 28;
+const HEADER_HEIGHT = 32;
+const CELL_WIDTH = 36;
+const LABEL_WIDTH = 120;
 
 interface StepSequencerProps {
   clip: Clip;
@@ -24,23 +28,8 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
   const updateDrumPattern = useProjectStore((s) => s.updateDrumPattern);
   const updateClip = useProjectStore((s) => s.updateClip);
   const setEditingDrumClipId = useUiStore((s) => s.setEditingDrumClipId);
-  const zoom = useUiStore((s) => s.zoom);
-  const scrollLeft = useUiStore((s) => s.scrollLeft);
-  const setScrollLeft = useUiStore((s) => s.setScrollLeft);
   const currentBeat = useTransportStore((s) => s.currentBeat);
   const isPlaying = useTransportStore((s) => s.isPlaying);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setEditingDrumClipId(null);
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [setEditingDrumClipId]);
 
   // Preview a pad sound
   const previewPad = useCallback((sampleUrl: string) => {
@@ -127,90 +116,49 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
       : -1;
 
   const stepsPerGroup = pattern.stepsPerBeat;
+  const gridWidth = pattern.steps * CELL_WIDTH;
+  const panelWidth = LABEL_WIDTH + gridWidth + 24;
+  const panelHeight = HEADER_HEIGHT + pattern.pads.length * ROW_HEIGHT + 40;
 
-  // Pixel width of each step cell — must exactly match timeline scale
-  const cellWidth = zoom / pattern.stepsPerBeat;
+  const onClose = useCallback(() => setEditingDrumClipId(null), [setEditingDrumClipId]);
 
-  // Offset of the clip's start position in timeline pixels
-  const clipOffsetPx = clip.startBeat * zoom;
-  // Total width of the grid content
-  const gridContentWidth = pattern.steps * cellWidth + clipOffsetPx;
-
-  // Sync horizontal scroll: forward wheel events to the shared scrollLeft
-  const scrollLeftRef = useRef(scrollLeft);
-  scrollLeftRef.current = scrollLeft;
-
-  useEffect(() => {
-    const el = gridRef.current;
-    if (!el) return;
-    const handler = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        e.preventDefault();
-        setScrollLeft(scrollLeftRef.current + e.deltaX);
-      } else if (e.shiftKey) {
-        e.preventDefault();
-        setScrollLeft(scrollLeftRef.current + e.deltaY);
-      }
-    };
-    el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  }, [setScrollLeft]);
+  const spbLabel = SPB_OPTIONS.find((o) => o.value === pattern.stepsPerBeat)?.label ?? `1/${pattern.stepsPerBeat}`;
 
   return (
-    <div
-      className="flex bg-zinc-900"
-      style={{ height: PANEL_HEIGHT }}
-      onClick={(e) => e.stopPropagation()}
+    <DraggablePanel
+      title="Step Sequencer"
+      onClose={onClose}
+      defaultWidth={Math.min(panelWidth, 900)}
+      defaultHeight={Math.min(panelHeight, 500)}
+      minWidth={400}
+      minHeight={260}
     >
-      {/* Left panel — aligned with track list sidebar (w-60 = 240px) */}
-      <div className="w-60 flex-shrink-0 flex flex-col border-r border-zinc-800/80">
-        {/* Header — same height as step number header on the right (26px) */}
-        <div className="flex items-center gap-2 px-3 h-[26px] text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/50">
-          <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Sequencer</span>
-          <div className="flex-1" />
-          <button
-            onClick={() => setEditingDrumClipId(null)}
-            className="flex h-5 w-5 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-            title="Close (Esc)"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M2 2l6 6M8 2l-6 6" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Pad list — sound configuration, rows aligned with grid rows */}
-        <div className="flex flex-col flex-shrink-0 overflow-y-auto">
-          {pattern.pads.map((pad) => (
-            <PadConfig
-              key={pad.index}
-              pad={pad}
-              onPreview={previewPad}
-              onChangeSample={setPadSample}
-            />
-          ))}
-        </div>
-
-        {/* Pattern controls — pushed to bottom */}
-        <div className="mt-auto flex items-center gap-3 px-3 py-1.5 text-xs text-zinc-400 flex-shrink-0 border-t border-zinc-800/50">
-          <label className="flex items-center gap-1">
-            Steps
+      <div
+        className="flex h-full flex-col bg-zinc-950"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Controls bar */}
+        <div className="flex items-center gap-4 px-3 py-1.5 text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/60 bg-zinc-900/60">
+          <span className="text-[10px] text-zinc-500">{clip.name}</span>
+          <div className="h-3.5 w-px bg-zinc-700/60" />
+          <label className="flex items-center gap-1.5">
+            <span className="text-zinc-500">Steps</span>
             <select
               value={pattern.steps}
               onChange={(e) => setSteps(Number(e.target.value))}
-              className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
+              className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
             >
               {STEP_OPTIONS.map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1">
-            Grid
+          <label className="flex items-center gap-1.5">
+            <span className="text-zinc-500">Grid</span>
             <select
               value={pattern.stepsPerBeat}
               onChange={(e) => setStepsPerBeat(Number(e.target.value))}
-              className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
+              className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
             >
               {SPB_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -223,55 +171,75 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
           >
             Clear
           </button>
+          <div className="flex-1" />
+          <span className="text-[10px] text-zinc-600">{spbLabel} &middot; {pattern.steps} steps</span>
         </div>
-      </div>
 
-      {/* Right panel — step grid, scroll-synced with timeline */}
-      <div
-        ref={gridRef}
-        className="flex-1 flex flex-col overflow-hidden overflow-y-auto"
-      >
-        {/* Step number header */}
-        <div className="flex-shrink-0 h-[26px] overflow-hidden border-b border-zinc-800/50">
-          <div className="relative h-full" style={{ width: gridContentWidth }}>
-            <div
-              className="absolute top-0 flex items-end h-full"
-              style={{ left: clipOffsetPx - scrollLeft }}
-            >
-              {Array.from({ length: pattern.steps }, (_, i) => (
-                <div
-                  key={i}
-                  className={`flex h-4 items-center justify-center text-[9px] ${
-                    i % stepsPerGroup === 0 ? 'text-zinc-400 font-medium' : 'text-zinc-600'
-                  } ${currentStep === i ? 'text-white' : ''}`}
-                  style={{ width: cellWidth }}
-                >
-                  {i % stepsPerGroup === 0 ? i / stepsPerGroup + 1 : ''}
-                </div>
+        {/* Grid area */}
+        <div className="flex flex-1 overflow-auto">
+          {/* Left: pad labels */}
+          <div className="flex-shrink-0 flex flex-col" style={{ width: LABEL_WIDTH }}>
+            {/* Header spacer */}
+            <div className="flex-shrink-0 border-b border-zinc-800/40" style={{ height: HEADER_HEIGHT }} />
+            {/* Pad rows */}
+            {pattern.pads.map((pad, idx) => (
+              <PadConfig
+                key={pad.index}
+                pad={pad}
+                rowIndex={idx}
+                onPreview={previewPad}
+                onChangeSample={setPadSample}
+              />
+            ))}
+          </div>
+
+          {/* Right: step grid */}
+          <div className="flex-1 overflow-auto">
+            {/* Step number header */}
+            <div className="flex-shrink-0 border-b border-zinc-800/40 flex" style={{ height: HEADER_HEIGHT, width: gridWidth }}>
+              {Array.from({ length: pattern.steps }, (_, i) => {
+                const isBeatStart = i % stepsPerGroup === 0;
+                const isCurrent = currentStep === i;
+                const globalBeat = clip.startBeat + i / stepsPerGroup;
+                const bar = Math.floor(globalBeat / 4) + 1;
+                const beatInBar = Math.floor(globalBeat % 4) + 1;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-center text-[10px] ${
+                      isCurrent
+                        ? 'text-white font-semibold bg-purple-500/20'
+                        : isBeatStart
+                          ? 'text-zinc-400 font-medium'
+                          : 'text-zinc-600'
+                    } ${isBeatStart ? 'border-l border-zinc-600/60' : 'border-l border-zinc-800/30'}`}
+                    style={{ width: CELL_WIDTH }}
+                  >
+                    {isBeatStart ? `${bar}.${beatInBar}` : '\u00B7'}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Grid rows */}
+            <div className="flex flex-col" style={{ width: gridWidth }}>
+              {pattern.pads.map((pad, idx) => (
+                <StepRow
+                  key={pad.index}
+                  padIndex={pad.index}
+                  rowIndex={idx}
+                  steps={pattern.steps}
+                  stepsPerGroup={stepsPerGroup}
+                  currentStep={currentStep}
+                  activeSet={activeSet.current}
+                  onToggle={toggleStep}
+                />
               ))}
             </div>
           </div>
         </div>
-
-        {/* Grid rows */}
-        <div className="flex flex-col flex-shrink-0">
-          {pattern.pads.map((pad) => (
-            <StepRow
-              key={pad.index}
-              padIndex={pad.index}
-              steps={pattern.steps}
-              stepsPerGroup={stepsPerGroup}
-              currentStep={currentStep}
-              activeSet={activeSet.current}
-              onToggle={toggleStep}
-              cellWidth={cellWidth}
-              clipOffsetPx={clipOffsetPx}
-              scrollLeft={scrollLeft}
-            />
-          ))}
-        </div>
       </div>
-    </div>
+    </DraggablePanel>
   );
 }
 
@@ -279,11 +247,12 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
 
 interface PadConfigProps {
   pad: { index: number; name: string; sampleUrl: string };
+  rowIndex: number;
   onPreview: (sampleUrl: string) => void;
   onChangeSample: (padIndex: number, sampleUrl: string, name: string) => void;
 }
 
-function PadConfig({ pad, onPreview, onChangeSample }: PadConfigProps) {
+function PadConfig({ pad, rowIndex, onPreview, onChangeSample }: PadConfigProps) {
   const [showSampleMenu, setShowSampleMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -301,14 +270,21 @@ function PadConfig({ pad, onPreview, onChangeSample }: PadConfigProps) {
     return () => document.removeEventListener('pointerdown', handleClick);
   }, [showSampleMenu]);
 
+  const isEven = rowIndex % 2 === 0;
+
   return (
-    <div className="flex items-center gap-1 px-2 h-[22px] border-b border-zinc-800/30">
+    <div
+      className={`flex items-center gap-1.5 px-2 border-b border-zinc-800/20 ${
+        isEven ? 'bg-zinc-900/40' : 'bg-zinc-950/60'
+      }`}
+      style={{ height: ROW_HEIGHT }}
+    >
       <button
         onClick={() => onPreview(pad.sampleUrl)}
-        className="flex h-4 w-4 items-center justify-center rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors flex-shrink-0"
+        className="flex h-5 w-5 items-center justify-center rounded text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors flex-shrink-0"
         title="Preview"
       >
-        <svg width="6" height="7" viewBox="0 0 7 8" fill="currentColor">
+        <svg width="7" height="8" viewBox="0 0 7 8" fill="currentColor">
           <path d="M0 0v8l7-4z" />
         </svg>
       </button>
@@ -316,7 +292,7 @@ function PadConfig({ pad, onPreview, onChangeSample }: PadConfigProps) {
         <button
           ref={btnRef}
           onClick={() => setShowSampleMenu((v) => !v)}
-          className="truncate text-[10px] text-zinc-300 hover:text-zinc-100 px-1 py-0.5 rounded hover:bg-zinc-800 transition-colors w-full text-left"
+          className="truncate text-[11px] text-zinc-300 hover:text-zinc-100 px-1.5 py-0.5 rounded hover:bg-zinc-800 transition-colors w-full text-left"
           title={pad.name}
         >
           {pad.name}
@@ -329,7 +305,7 @@ function PadConfig({ pad, onPreview, onChangeSample }: PadConfigProps) {
           >
             {DRUM_KIT_BANKS.map((bank) => (
               <div key={bank.id}>
-                <div className="px-3 py-1 text-[9px] font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-850 sticky top-0">
+                <div className="px-3 py-1 text-[9px] font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900 sticky top-0">
                   {bank.name}
                 </div>
                 {bank.sounds.map((sound) => (
@@ -361,60 +337,56 @@ function PadConfig({ pad, onPreview, onChangeSample }: PadConfigProps) {
 
 interface StepRowProps {
   padIndex: number;
+  rowIndex: number;
   steps: number;
   stepsPerGroup: number;
   currentStep: number;
   activeSet: Set<string>;
   onToggle: (padIndex: number, step: number) => void;
-  cellWidth: number;
-  clipOffsetPx: number;
-  scrollLeft: number;
 }
 
 function StepRow({
   padIndex,
+  rowIndex,
   steps,
   stepsPerGroup,
   currentStep,
   activeSet,
   onToggle,
-  cellWidth,
-  clipOffsetPx,
-  scrollLeft,
 }: StepRowProps) {
+  const isEven = rowIndex % 2 === 0;
+
   return (
-    <div className="relative h-[22px] overflow-hidden">
-      <div
-        className="absolute top-0 flex"
-        style={{ left: clipOffsetPx - scrollLeft }}
-      >
-        {Array.from({ length: steps }, (_, i) => {
-          const isActive = activeSet.has(`${padIndex}:${i}`);
-          const isBeatStart = i % stepsPerGroup === 0;
-          const isCurrentStep = currentStep === i;
-          // Scale the toggle dot proportionally, capped to row height
-          const dotSize = Math.min(Math.max(cellWidth * 0.65, 4), 18);
-          return (
-            <button
-              key={i}
-              onClick={() => onToggle(padIndex, i)}
-              className={`flex h-[22px] items-center justify-center border-l transition-colors ${
-                isBeatStart ? 'border-zinc-600' : 'border-zinc-800'
-              } ${isCurrentStep ? 'bg-zinc-700/60' : ''}`}
-              style={{ width: cellWidth }}
-            >
-              <div
-                className={`rounded-sm transition-all ${
-                  isActive
-                    ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30'
-                    : 'bg-zinc-800 hover:bg-zinc-700'
-                }`}
-                style={{ width: dotSize, height: dotSize }}
-              />
-            </button>
-          );
-        })}
-      </div>
+    <div
+      className={`flex border-b border-zinc-800/20 ${
+        isEven ? 'bg-zinc-900/40' : 'bg-zinc-950/60'
+      }`}
+      style={{ height: ROW_HEIGHT }}
+    >
+      {Array.from({ length: steps }, (_, i) => {
+        const isActive = activeSet.has(`${padIndex}:${i}`);
+        const isBeatStart = i % stepsPerGroup === 0;
+        const isCurrentStep = currentStep === i;
+        return (
+          <button
+            key={i}
+            onClick={() => onToggle(padIndex, i)}
+            className={`flex items-center justify-center transition-colors ${
+              isBeatStart ? 'border-l border-zinc-600/60' : 'border-l border-zinc-800/30'
+            } ${isCurrentStep ? 'bg-zinc-700/40' : ''}`}
+            style={{ width: CELL_WIDTH, height: ROW_HEIGHT }}
+          >
+            <div
+              className={`rounded transition-all ${
+                isActive
+                  ? 'bg-purple-400/85 border border-purple-600/60 shadow-sm shadow-purple-500/20'
+                  : 'bg-zinc-800/70 border border-zinc-700/40 hover:bg-zinc-700/60 hover:border-zinc-600/50'
+              }`}
+              style={{ width: ROW_HEIGHT - 10, height: ROW_HEIGHT - 10 }}
+            />
+          </button>
+        );
+      })}
     </div>
   );
 }
