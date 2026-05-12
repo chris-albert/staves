@@ -4,7 +4,6 @@ import type { MidiPattern, MidiNote, Clip } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTransportStore } from '@/stores/transportStore';
-import { DraggablePanel } from '@/components/layout/DraggablePanel';
 
 const ROW_HEIGHT = 18;
 const KEYBOARD_WIDTH = 52;
@@ -27,6 +26,95 @@ interface PianoRollProps {
   pattern: MidiPattern;
 }
 
+/** Sidebar for the piano roll, rendered in the track list sidebar */
+export function PianoRollSidebar({ clip, pattern }: PianoRollProps) {
+  const setEditingMidiClipId = useUiStore((s) => s.setEditingMidiClipId);
+  const updateClip = useProjectStore((s) => s.updateClip);
+  const drawMode = useUiStore((s) => s.pianoRollDrawMode);
+  const setDrawMode = useUiStore((s) => s.setPianoRollDrawMode);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(clip.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const commitName = useCallback(() => {
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== clip.name) {
+      updateClip(clip.id, { name: trimmed });
+    } else {
+      setNameValue(clip.name);
+    }
+    setEditingName(false);
+  }, [nameValue, clip.id, clip.name, updateClip]);
+
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [editingName]);
+
+  return (
+    <div className="flex flex-col h-full bg-zinc-900">
+      <div className="flex items-center gap-2 px-3 h-[26px] text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/50">
+        {editingName ? (
+          <input
+            ref={nameInputRef}
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitName();
+              if (e.key === 'Escape') { setNameValue(clip.name); setEditingName(false); }
+            }}
+            className="text-[10px] font-semibold text-zinc-200 bg-zinc-800 rounded px-1 py-0 outline-none ring-1 ring-zinc-600 focus:ring-zinc-400 min-w-0 flex-1"
+          />
+        ) : (
+          <span
+            className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider truncate cursor-text hover:text-zinc-200 transition-colors"
+            onClick={() => { setNameValue(clip.name); setEditingName(true); }}
+            title="Click to rename"
+          >
+            {clip.name}
+          </span>
+        )}
+        <div className="flex-1" />
+        <button
+          onClick={() => setEditingMidiClipId(null)}
+          className="flex h-5 w-5 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors flex-shrink-0"
+          title="Close"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M2 2l6 6M8 2l-6 6" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex-1 flex flex-col gap-3 px-3 py-3">
+        <div className="flex rounded overflow-hidden border border-zinc-700/60">
+          <button
+            onClick={() => setDrawMode(true)}
+            className={`flex-1 px-2 py-1 text-[10px] font-medium transition-colors ${
+              drawMode ? 'bg-cyan-600/80 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Draw
+          </button>
+          <button
+            onClick={() => setDrawMode(false)}
+            className={`flex-1 px-2 py-1 text-[10px] font-medium transition-colors ${
+              !drawMode ? 'bg-cyan-600/80 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Select
+          </button>
+        </div>
+        <div className="text-[10px] text-zinc-500">Snap 1/16</div>
+        <div className="text-[10px] text-zinc-600">Zoom: Ctrl+Scroll</div>
+      </div>
+    </div>
+  );
+}
+
 export function PianoRoll({ clip, pattern }: PianoRollProps) {
   const updateMidiPattern = useProjectStore((s) => s.updateMidiPattern);
   const setEditingMidiClipId = useUiStore((s) => s.setEditingMidiClipId);
@@ -38,14 +126,10 @@ export function PianoRoll({ clip, pattern }: PianoRollProps) {
   const rulerRef = useRef<HTMLDivElement>(null);
 
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
-  const [drawMode, setDrawMode] = useState(true);
+  const drawMode = useUiStore((s) => s.pianoRollDrawMode);
   const previewStopRef = useRef<(() => void) | null>(null);
 
-  // Zoom: pixels per beat in the piano roll
-  const [rollZoom, setRollZoom] = useState(40);
-  const patternWidth = pattern.durationBeats * rollZoom;
-
-  // Measure container so grid always fills the modal width
+  // Measure container width so we can fit the pattern to fill it
   const [containerWidth, setContainerWidth] = useState(0);
   useEffect(() => {
     const el = scrollRef.current;
@@ -58,13 +142,18 @@ export function PianoRoll({ clip, pattern }: PianoRollProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const gridWidth = Math.max(patternWidth, containerWidth);
+
+  // Zoom: pixels per beat — default to fit the pattern within the container
+  const [rollZoomOverride, setRollZoomOverride] = useState<number | null>(null);
+  const autoZoom = containerWidth > 0 && pattern.durationBeats > 0
+    ? containerWidth / pattern.durationBeats
+    : 40;
+  const rollZoom = rollZoomOverride ?? autoZoom;
+  const gridWidth = pattern.durationBeats * rollZoom;
 
   // Snap to 1/16th note
   const snapDiv = 0.25;
   const snap = useCallback((beat: number) => Math.round(beat / snapDiv) * snapDiv, []);
-
-  const onClose = useCallback(() => setEditingMidiClipId(null), [setEditingMidiClipId]);
 
   // Close on Escape, delete notes
   useEffect(() => {
@@ -107,13 +196,16 @@ export function PianoRoll({ clip, pattern }: PianoRollProps) {
     return () => grid.removeEventListener('scroll', sync);
   }, []);
 
-  // Zoom with wheel
+  // Zoom with wheel — once the user zooms manually, override auto-fit
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      setRollZoom((z) => Math.max(15, Math.min(120, z - e.deltaY * 0.1)));
+      setRollZoomOverride((prev) => {
+        const current = prev ?? autoZoom;
+        return Math.max(15, Math.min(200, current - e.deltaY * 0.1));
+      });
     }
-  }, []);
+  }, [autoZoom]);
 
   // Preview note on keyboard click
   const previewNote = useCallback((pitch: number) => {
@@ -221,45 +313,7 @@ export function PianoRoll({ clip, pattern }: PianoRollProps) {
   const showPlayhead = isPlaying && playheadBeat >= 0 && playheadBeat <= pattern.durationBeats;
 
   return (
-    <DraggablePanel
-      title="Piano Roll"
-      onClose={onClose}
-      defaultWidth={760}
-      defaultHeight={440}
-      minWidth={480}
-      minHeight={300}
-    >
-      <div className="flex h-full flex-col bg-zinc-950">
-        {/* Toolbar */}
-        <div className="flex items-center gap-3 px-3 py-1.5 border-b border-zinc-800/60 bg-zinc-900/60 flex-shrink-0">
-          <span className="text-[10px] text-zinc-500">{clip.name}</span>
-          <div className="h-3.5 w-px bg-zinc-700/60" />
-          <div className="flex rounded overflow-hidden border border-zinc-700/60">
-            <button
-              onClick={() => setDrawMode(true)}
-              className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
-                drawMode ? 'bg-cyan-600/80 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              Draw
-            </button>
-            <button
-              onClick={() => setDrawMode(false)}
-              className={`px-2.5 py-1 text-[10px] font-medium transition-colors ${
-                !drawMode ? 'bg-cyan-600/80 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              Select
-            </button>
-          </div>
-          <div className="h-3.5 w-px bg-zinc-700/60" />
-          <span className="text-[10px] text-zinc-500">Snap 1/16</span>
-          <div className="flex-1" />
-          <span className="text-[10px] text-zinc-600">
-            {pattern.notes.length} note{pattern.notes.length !== 1 ? 's' : ''} &middot; {pattern.durationBeats} beats &middot; Zoom: Ctrl+Scroll
-          </span>
-        </div>
-
+      <div className="flex flex-col bg-zinc-950" style={{ height: 340 }}>
         {/* Main content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Piano keyboard */}
@@ -460,6 +514,5 @@ export function PianoRoll({ clip, pattern }: PianoRollProps) {
           </div>
         </div>
       </div>
-    </DraggablePanel>
   );
 }

@@ -25,6 +25,7 @@ interface UiState {
   snapDivision: number; // beats (e.g. 1 = snap to beat, 0.25 = snap to 16th)
   editingDrumClipId: string | null;
   editingMidiClipId: string | null;
+  pianoRollDrawMode: boolean;
   clipboard: Clip[];
   contextMenu: { x: number; y: number; clipId: string } | null;
 }
@@ -42,6 +43,7 @@ interface UiActions {
   setSnapDivision: (division: number) => void;
   setEditingDrumClipId: (id: string | null) => void;
   setEditingMidiClipId: (id: string | null) => void;
+  setPianoRollDrawMode: (mode: boolean) => void;
   setClipboard: (clips: Clip[]) => void;
   setContextMenu: (menu: UiState['contextMenu']) => void;
 }
@@ -58,6 +60,7 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   snapDivision: 1,
   editingDrumClipId: null,
   editingMidiClipId: null,
+  pianoRollDrawMode: true,
   clipboard: [],
   contextMenu: null,
 
@@ -84,6 +87,7 @@ export const useUiStore = create<UiState & UiActions>()((set) => ({
   setSnapDivision: (snapDivision) => set({ snapDivision }),
   setEditingDrumClipId: (editingDrumClipId) => set({ editingDrumClipId }),
   setEditingMidiClipId: (editingMidiClipId) => set({ editingMidiClipId }),
+  setPianoRollDrawMode: (pianoRollDrawMode) => set({ pianoRollDrawMode }),
   setClipboard: (clipboard) => set({ clipboard }),
   setContextMenu: (contextMenu) => set({ contextMenu }),
 }));

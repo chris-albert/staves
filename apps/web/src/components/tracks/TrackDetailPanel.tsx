@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioEngine, DRUM_KIT_BANKS, ALL_DRUM_SOUNDS, DEFAULT_SYNTH_PATCH } from '@staves/audio-engine';
 import type { Track, DrumPattern, MidiPattern, Clip, SynthPatch, OscillatorWaveform, FilterType } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
@@ -15,39 +15,11 @@ interface TrackDetailPanelProps {
 }
 
 export function TrackDetailPanel({ track, trackClips, drumPatterns, midiPatterns }: TrackDetailPanelProps) {
-  const setSelectedTrackId = useUiStore((s) => s.setSelectedTrackId);
-
   return (
     <div
-      className="flex bg-zinc-900"
-      style={{ height: PANEL_HEIGHT }}
+      className="flex bg-zinc-900 h-full"
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Left panel — aligned with track list sidebar (w-60 = 240px) */}
-      <div className="w-60 flex-shrink-0 flex flex-col border-r border-zinc-800/80">
-        <div className="flex items-center gap-2 px-3 h-[26px] text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/50">
-          <div
-            className="w-2 h-2 rounded-full flex-shrink-0"
-            style={{ backgroundColor: track.color }}
-          />
-          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider truncate">
-            {track.name}
-          </span>
-          <div className="flex-1" />
-          <button
-            onClick={() => setSelectedTrackId(null)}
-            className="flex h-5 w-5 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-            title="Close"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M2 2l6 6M8 2l-6 6" />
-            </svg>
-          </button>
-        </div>
-        <TrackControlsSummary track={track} />
-      </div>
-
-      {/* Right panel */}
       <div className="flex-1 overflow-hidden overflow-y-auto">
         {track.type === 'drum' ? (
           <DrumSoundEditor track={track} trackClips={trackClips} drumPatterns={drumPatterns} />
@@ -56,6 +28,89 @@ export function TrackDetailPanel({ track, trackClips, drumPatterns, midiPatterns
         ) : (
           <AudioTrackDetail track={track} />
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Sidebar controls for the track detail panel, rendered in the track list sidebar */
+export function TrackDetailSidebar({ track }: { track: Track }) {
+  const setSelectedTrackId = useUiStore((s) => s.setSelectedTrackId);
+  const updateTrack = useProjectStore((s) => s.updateTrack);
+  const removeTrack = useProjectStore((s) => s.removeTrack);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(track.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const commitName = useCallback(() => {
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== track.name) {
+      updateTrack(track.id, { name: trimmed });
+    } else {
+      setNameValue(track.name);
+    }
+    setEditingName(false);
+  }, [nameValue, track.id, track.name, updateTrack]);
+
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [editingName]);
+
+  return (
+    <div className="flex flex-col h-full bg-zinc-900">
+      <div className="flex items-center gap-2 px-3 h-[26px] text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/50">
+        <div
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ backgroundColor: track.color }}
+        />
+        {editingName ? (
+          <input
+            ref={nameInputRef}
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitName();
+              if (e.key === 'Escape') { setNameValue(track.name); setEditingName(false); }
+            }}
+            className="text-[10px] font-semibold text-zinc-200 bg-zinc-800 rounded px-1 py-0 outline-none ring-1 ring-zinc-600 focus:ring-zinc-400 min-w-0 flex-1"
+          />
+        ) : (
+          <span
+            className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider truncate cursor-text hover:text-zinc-200 transition-colors"
+            onClick={() => { setNameValue(track.name); setEditingName(true); }}
+            title="Click to rename"
+          >
+            {track.name}
+          </span>
+        )}
+        <div className="flex-1" />
+        <button
+          onClick={() => setSelectedTrackId(null)}
+          className="flex h-5 w-5 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors flex-shrink-0"
+          title="Close"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M2 2l6 6M8 2l-6 6" />
+          </svg>
+        </button>
+      </div>
+      <TrackControlsSummary track={track} />
+      <div className="px-3 pb-3">
+        <button
+          onClick={() => removeTrack(track.id)}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors"
+          title="Delete track"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M1 1l8 8M9 1l-8 8" />
+          </svg>
+          Delete Track
+        </button>
       </div>
     </div>
   );

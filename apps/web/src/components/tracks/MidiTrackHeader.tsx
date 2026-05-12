@@ -19,7 +19,6 @@ interface MidiTrackHeaderProps {
 
 export function MidiTrackHeader({ track, stereoLevel }: MidiTrackHeaderProps) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
-  const removeTrack = useProjectStore((s) => s.removeTrack);
   const tracks = useProjectStore((s) => s.tracks);
   const selectedTrackId = useUiStore((s) => s.selectedTrackId);
   const setSelectedTrackId = useUiStore((s) => s.setSelectedTrackId);
@@ -28,18 +27,10 @@ export function MidiTrackHeader({ track, stereoLevel }: MidiTrackHeaderProps) {
   const anySoloed = tracks.some((t) => t.isSolo);
   const effectivelyMuted = anySoloed && !track.isSolo;
 
-  const [editingName, setEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(track.name);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorRef = useRef<HTMLButtonElement>(null);
   const colorMenuRef = useRef<HTMLDivElement>(null);
   const [colorPos, setColorPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (editingName) nameInputRef.current?.select();
-  }, [editingName]);
 
   useEffect(() => {
     if (!showColorPicker) return;
@@ -53,16 +44,6 @@ export function MidiTrackHeader({ track, stereoLevel }: MidiTrackHeaderProps) {
     document.addEventListener('pointerdown', handleClick);
     return () => document.removeEventListener('pointerdown', handleClick);
   }, [showColorPicker]);
-
-  const commitName = useCallback(() => {
-    const trimmed = nameValue.trim();
-    if (trimmed && trimmed !== track.name) {
-      updateTrack(track.id, { name: trimmed });
-    } else {
-      setNameValue(track.name);
-    }
-    setEditingName(false);
-  }, [nameValue, track.id, track.name, updateTrack]);
 
   const openColorPicker = useCallback(() => {
     if (!colorRef.current) return;
@@ -80,10 +61,6 @@ export function MidiTrackHeader({ track, stereoLevel }: MidiTrackHeaderProps) {
     () => updateTrack(track.id, { isSolo: !track.isSolo }),
     [track.id, track.isSolo, updateTrack],
   );
-
-  const handleDelete = useCallback(() => {
-    removeTrack(track.id);
-  }, [track.id, removeTrack]);
 
   return (
     <div
@@ -129,7 +106,7 @@ export function MidiTrackHeader({ track, stereoLevel }: MidiTrackHeaderProps) {
       )}
 
       <div className="flex flex-1 flex-col gap-1.5 px-3 py-2">
-        {/* Row 1: name + synth icon + delete */}
+        {/* Row 1: name + synth icon */}
         <div className="flex items-center gap-1.5">
           {/* Synth/MIDI icon */}
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 text-zinc-500">
@@ -140,42 +117,9 @@ export function MidiTrackHeader({ track, stereoLevel }: MidiTrackHeaderProps) {
             <path d="M2 7V2L12 1v1" stroke="currentColor" strokeWidth="0.8" opacity="0.5" />
           </svg>
 
-          {editingName ? (
-            <input
-              ref={nameInputRef}
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={commitName}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitName();
-                if (e.key === 'Escape') {
-                  setNameValue(track.name);
-                  setEditingName(false);
-                }
-              }}
-              className="flex-1 min-w-0 rounded bg-zinc-800 px-1 py-0.5 text-[13px] font-medium text-zinc-100 outline-none ring-1 ring-zinc-600 focus:ring-zinc-400"
-            />
-          ) : (
-            <span
-              className="flex-1 truncate text-[13px] font-medium text-zinc-200 cursor-text rounded px-1 py-0.5 -mx-1 hover:bg-zinc-800/60 transition-colors"
-              onDoubleClick={() => {
-                setNameValue(track.name);
-                setEditingName(true);
-              }}
-              title="Double-click to rename"
-            >
-              {track.name}
-            </span>
-          )}
-          <button
-            onClick={handleDelete}
-            className="flex h-5 w-5 items-center justify-center rounded text-zinc-700 opacity-0 hover:bg-zinc-800 hover:text-zinc-400 group-hover:opacity-100 transition-all"
-            title="Delete track"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M1 1l8 8M9 1l-8 8" />
-            </svg>
-          </button>
+          <span className="flex-1 truncate text-[13px] font-medium text-zinc-200">
+            {track.name}
+          </span>
         </div>
 
         {/* Row 2: controls (no record arm for MIDI tracks) */}

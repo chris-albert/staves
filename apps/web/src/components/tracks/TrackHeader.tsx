@@ -22,7 +22,6 @@ interface TrackHeaderProps {
 
 export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProps) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
-  const removeTrack = useProjectStore((s) => s.removeTrack);
   const tracks = useProjectStore((s) => s.tracks);
   const selectedTrackId = useUiStore((s) => s.selectedTrackId);
   const setSelectedTrackId = useUiStore((s) => s.setSelectedTrackId);
@@ -31,19 +30,10 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
   const anySoloed = tracks.some((t) => t.isSolo);
   const effectivelyMuted = anySoloed && !track.isSolo;
 
-  const [editingName, setEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(track.name);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorRef = useRef<HTMLButtonElement>(null);
   const colorMenuRef = useRef<HTMLDivElement>(null);
   const [colorPos, setColorPos] = useState({ top: 0, left: 0 });
-
-  // Focus name input when editing
-  useEffect(() => {
-    if (editingName) nameInputRef.current?.select();
-  }, [editingName]);
 
   // Close color picker on outside click
   useEffect(() => {
@@ -58,16 +48,6 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
     document.addEventListener('pointerdown', handleClick);
     return () => document.removeEventListener('pointerdown', handleClick);
   }, [showColorPicker]);
-
-  const commitName = useCallback(() => {
-    const trimmed = nameValue.trim();
-    if (trimmed && trimmed !== track.name) {
-      updateTrack(track.id, { name: trimmed });
-    } else {
-      setNameValue(track.name);
-    }
-    setEditingName(false);
-  }, [nameValue, track.id, track.name, updateTrack]);
 
   const openColorPicker = useCallback(() => {
     if (!colorRef.current) return;
@@ -90,10 +70,6 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
     () => updateTrack(track.id, { isArmed: !track.isArmed }),
     [track.id, track.isArmed, updateTrack],
   );
-
-  const handleDelete = useCallback(() => {
-    removeTrack(track.id);
-  }, [track.id, removeTrack]);
 
   return (
     <div
@@ -140,49 +116,16 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
       )}
 
       <div className="flex flex-1 flex-col gap-1.5 px-3 py-2">
-        {/* Row 1: name + input select + delete */}
+        {/* Row 1: name + input select */}
         <div className="flex items-center gap-1.5">
-          {editingName ? (
-            <input
-              ref={nameInputRef}
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={commitName}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitName();
-                if (e.key === 'Escape') {
-                  setNameValue(track.name);
-                  setEditingName(false);
-                }
-              }}
-              className="flex-1 min-w-0 rounded bg-zinc-800 px-1 py-0.5 text-[13px] font-medium text-zinc-100 outline-none ring-1 ring-zinc-600 focus:ring-zinc-400"
-            />
-          ) : (
-            <span
-              className="flex-1 truncate text-[13px] font-medium text-zinc-200 cursor-text rounded px-1 py-0.5 -mx-1 hover:bg-zinc-800/60 transition-colors"
-              onDoubleClick={() => {
-                setNameValue(track.name);
-                setEditingName(true);
-              }}
-              title="Double-click to rename"
-            >
-              {track.name}
-            </span>
-          )}
+          <span className="flex-1 truncate text-[13px] font-medium text-zinc-200">
+            {track.name}
+          </span>
           <InputSelect
             devices={audioInputs}
             value={track.inputDeviceId}
             onChange={(id) => updateTrack(track.id, { inputDeviceId: id })}
           />
-          <button
-            onClick={handleDelete}
-            className="flex h-5 w-5 items-center justify-center rounded text-zinc-700 opacity-0 hover:bg-zinc-800 hover:text-zinc-400 group-hover:opacity-100 transition-all"
-            title="Delete track"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M1 1l8 8M9 1l-8 8" />
-            </svg>
-          </button>
         </div>
 
         {/* Row 2: controls */}

@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTransportStore } from '@/stores/transportStore';
@@ -20,9 +20,12 @@ interface TimelineProps {
   onCreateDrumClip?: (trackId: string, startBeat: number) => void;
   onCreateMidiClip?: (trackId: string, startBeat: number) => void;
   onDropAudioFile?: (trackId: string, startBeat: number, file: File) => void;
+  inlinePanelTrackId?: string | null;
+  inlinePanelHeight?: number;
+  inlinePanelContent?: ReactNode;
 }
 
-export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onCreateMidiClip, onDropAudioFile }: TimelineProps) {
+export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onCreateMidiClip, onDropAudioFile, inlinePanelTrackId, inlinePanelHeight, inlinePanelContent }: TimelineProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const clips = useProjectStore((s) => s.clips);
   const drumPatterns = useProjectStore((s) => s.drumPatterns);
@@ -117,7 +120,15 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onC
       const x = e.clientX - rect.left + scrollLeft;
       const y = e.clientY - rect.top;
 
-      const trackIndex = Math.floor(y / 80);
+      // Account for editor panel offset when determining which track was clicked
+      const edIdx = inlinePanelTrackId ? tracks.findIndex((t) => t.id === inlinePanelTrackId) : -1;
+      const edHeight = edIdx >= 0 && inlinePanelHeight ? inlinePanelHeight : 0;
+      let adjustedY = y;
+      if (edIdx >= 0 && y > (edIdx + 1) * 80) {
+        adjustedY = y - edHeight;
+      }
+
+      const trackIndex = Math.floor(adjustedY / 80);
       if (trackIndex < 0 || trackIndex >= tracks.length) return;
 
       const track = tracks[trackIndex];
@@ -132,7 +143,7 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onC
         onCreateMidiClip(track.id, snappedBeat);
       }
     },
-    [onCreateDrumClip, onCreateMidiClip, scrollLeft, zoom, tracks, snapEnabled, snapDivision],
+    [onCreateDrumClip, onCreateMidiClip, scrollLeft, zoom, tracks, snapEnabled, snapDivision, inlinePanelTrackId, inlinePanelHeight],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -179,7 +190,9 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onC
 
   const trackHeight = 80;
   const rulerHeight = 24;
-  const trackContentHeight = tracks.length * trackHeight;
+  const editorTrackIndex = inlinePanelTrackId ? tracks.findIndex((t) => t.id === inlinePanelTrackId) : -1;
+  const editorInsertHeight = editorTrackIndex >= 0 && inlinePanelHeight ? inlinePanelHeight : 0;
+  const trackContentHeight = tracks.length * trackHeight + editorInsertHeight;
   const availableHeight = Math.max(containerHeight - rulerHeight, 200);
   const trackAreaMinHeight = Math.max(trackContentHeight, availableHeight);
 
@@ -204,6 +217,8 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onC
 
         {tracks.map((track, i) => {
           const trackClips = clips.filter((c) => c.trackId === track.id);
+          // Offset tracks after the editor insertion point
+          const offset = editorTrackIndex >= 0 && i > editorTrackIndex ? editorInsertHeight : 0;
           return (
             <TrackLane
               key={track.id}
@@ -213,11 +228,21 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onC
               midiPatterns={midiPatterns}
               zoom={zoom}
               scrollLeft={scrollLeft}
-              top={i * trackHeight}
+              top={i * trackHeight + offset}
               height={trackHeight}
             />
           );
         })}
+
+        {/* Inline clip editor panel rendered between tracks */}
+        {inlinePanelContent && editorTrackIndex >= 0 && inlinePanelHeight && (
+          <div
+            className="absolute left-0 right-0 border-t border-b border-zinc-700 z-10"
+            style={{ top: (editorTrackIndex + 1) * trackHeight, height: inlinePanelHeight }}
+          >
+            {inlinePanelContent}
+          </div>
+        )}
 
         <RecordingRegion zoom={zoom} scrollLeft={scrollLeft} trackHeight={trackHeight} />
         {loopEnabled && <LoopRegion zoom={zoom} scrollLeft={scrollLeft} />}

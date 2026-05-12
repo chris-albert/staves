@@ -4,7 +4,6 @@ import type { DrumPattern, Clip } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTransportStore } from '@/stores/transportStore';
-import { DraggablePanel } from '@/components/layout/DraggablePanel';
 
 const STEP_OPTIONS = [8, 16, 32] as const;
 const SPB_OPTIONS = [
@@ -24,10 +23,129 @@ interface StepSequencerProps {
   pattern: DrumPattern;
 }
 
-export function StepSequencer({ clip, pattern }: StepSequencerProps) {
+/** Sidebar for the step sequencer, rendered in the track list sidebar */
+export function StepSequencerSidebar({ clip, pattern }: StepSequencerProps) {
+  const setEditingDrumClipId = useUiStore((s) => s.setEditingDrumClipId);
   const updateDrumPattern = useProjectStore((s) => s.updateDrumPattern);
   const updateClip = useProjectStore((s) => s.updateClip);
-  const setEditingDrumClipId = useUiStore((s) => s.setEditingDrumClipId);
+
+  const setSteps = useCallback(
+    (steps: number) => {
+      const filtered = pattern.activeSteps.filter((s) => s.step < steps);
+      const newDuration = steps / pattern.stepsPerBeat;
+      updateDrumPattern(pattern.id, { steps, activeSteps: filtered });
+      updateClip(clip.id, { durationBeats: newDuration, sourceDurationBeats: newDuration });
+    },
+    [pattern.id, pattern.stepsPerBeat, pattern.activeSteps, updateDrumPattern, clip.id, updateClip],
+  );
+
+  const setStepsPerBeat = useCallback(
+    (stepsPerBeat: number) => {
+      const newDuration = pattern.steps / stepsPerBeat;
+      updateDrumPattern(pattern.id, { stepsPerBeat });
+      updateClip(clip.id, { durationBeats: newDuration, sourceDurationBeats: newDuration });
+    },
+    [pattern.id, pattern.steps, updateDrumPattern, clip.id, updateClip],
+  );
+
+  const clearAll = useCallback(() => {
+    updateDrumPattern(pattern.id, { activeSteps: [] });
+  }, [pattern.id, updateDrumPattern]);
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(clip.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const commitName = useCallback(() => {
+    const trimmed = nameValue.trim();
+    if (trimmed && trimmed !== clip.name) {
+      updateClip(clip.id, { name: trimmed });
+    } else {
+      setNameValue(clip.name);
+    }
+    setEditingName(false);
+  }, [nameValue, clip.id, clip.name, updateClip]);
+
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [editingName]);
+
+  return (
+    <div className="flex flex-col h-full bg-zinc-900">
+      <div className="flex items-center gap-2 px-3 h-[26px] text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/50">
+        {editingName ? (
+          <input
+            ref={nameInputRef}
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitName();
+              if (e.key === 'Escape') { setNameValue(clip.name); setEditingName(false); }
+            }}
+            className="text-[10px] font-semibold text-zinc-200 bg-zinc-800 rounded px-1 py-0 outline-none ring-1 ring-zinc-600 focus:ring-zinc-400 min-w-0 flex-1"
+          />
+        ) : (
+          <span
+            className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider truncate cursor-text hover:text-zinc-200 transition-colors"
+            onClick={() => { setNameValue(clip.name); setEditingName(true); }}
+            title="Click to rename"
+          >
+            {clip.name}
+          </span>
+        )}
+        <div className="flex-1" />
+        <button
+          onClick={() => setEditingDrumClipId(null)}
+          className="flex h-5 w-5 items-center justify-center rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors flex-shrink-0"
+          title="Close"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M2 2l6 6M8 2l-6 6" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex-1 flex flex-col gap-3 px-3 py-3">
+        <label className="flex items-center gap-1.5">
+          <span className="text-[10px] text-zinc-500">Steps</span>
+          <select
+            value={pattern.steps}
+            onChange={(e) => setSteps(Number(e.target.value))}
+            className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
+          >
+            {STEP_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className="text-[10px] text-zinc-500">Grid</span>
+          <select
+            value={pattern.stepsPerBeat}
+            onChange={(e) => setStepsPerBeat(Number(e.target.value))}
+            className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
+          >
+            {SPB_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          onClick={clearAll}
+          className="rounded px-1.5 py-0.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors text-[10px] text-left w-fit"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function StepSequencer({ clip, pattern }: StepSequencerProps) {
+  const updateDrumPattern = useProjectStore((s) => s.updateDrumPattern);
   const currentBeat = useTransportStore((s) => s.currentBeat);
   const isPlaying = useTransportStore((s) => s.isPlaying);
 
@@ -57,33 +175,6 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
     [pattern.id, pattern.activeSteps, updateDrumPattern],
   );
 
-  // Change step count
-  const setSteps = useCallback(
-    (steps: number) => {
-      const filtered = pattern.activeSteps.filter((s) => s.step < steps);
-      const newDuration = steps / pattern.stepsPerBeat;
-      updateDrumPattern(pattern.id, { steps, activeSteps: filtered });
-      updateClip(clip.id, {
-        durationBeats: newDuration,
-        sourceDurationBeats: newDuration,
-      });
-    },
-    [pattern.id, pattern.stepsPerBeat, pattern.activeSteps, updateDrumPattern, clip.id, updateClip],
-  );
-
-  // Change steps per beat
-  const setStepsPerBeat = useCallback(
-    (stepsPerBeat: number) => {
-      const newDuration = pattern.steps / stepsPerBeat;
-      updateDrumPattern(pattern.id, { stepsPerBeat });
-      updateClip(clip.id, {
-        durationBeats: newDuration,
-        sourceDurationBeats: newDuration,
-      });
-    },
-    [pattern.id, pattern.steps, updateDrumPattern, clip.id, updateClip],
-  );
-
   // Change pad sample
   const setPadSample = useCallback(
     (padIndex: number, sampleUrl: string, name: string) => {
@@ -94,11 +185,6 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
     },
     [pattern.id, pattern.pads, updateDrumPattern],
   );
-
-  // Clear all steps
-  const clearAll = useCallback(() => {
-    updateDrumPattern(pattern.id, { activeSteps: [] });
-  }, [pattern.id, updateDrumPattern]);
 
   // Active step lookup for fast grid rendering
   const activeSet = useRef(new Set<string>());
@@ -117,64 +203,13 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
 
   const stepsPerGroup = pattern.stepsPerBeat;
   const gridWidth = pattern.steps * CELL_WIDTH;
-  const panelWidth = LABEL_WIDTH + gridWidth + 24;
-  const panelHeight = HEADER_HEIGHT + pattern.pads.length * ROW_HEIGHT + 40;
-
-  const onClose = useCallback(() => setEditingDrumClipId(null), [setEditingDrumClipId]);
-
-  const spbLabel = SPB_OPTIONS.find((o) => o.value === pattern.stepsPerBeat)?.label ?? `1/${pattern.stepsPerBeat}`;
 
   return (
-    <DraggablePanel
-      title="Step Sequencer"
-      onClose={onClose}
-      defaultWidth={Math.min(panelWidth, 900)}
-      defaultHeight={Math.min(panelHeight, 500)}
-      minWidth={400}
-      minHeight={260}
-    >
       <div
-        className="flex h-full flex-col bg-zinc-950"
+        className="flex flex-col bg-zinc-950"
+        style={{ height: Math.min(HEADER_HEIGHT + pattern.pads.length * ROW_HEIGHT + 40, 380) }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Controls bar */}
-        <div className="flex items-center gap-4 px-3 py-1.5 text-xs text-zinc-400 flex-shrink-0 border-b border-zinc-800/60 bg-zinc-900/60">
-          <span className="text-[10px] text-zinc-500">{clip.name}</span>
-          <div className="h-3.5 w-px bg-zinc-700/60" />
-          <label className="flex items-center gap-1.5">
-            <span className="text-zinc-500">Steps</span>
-            <select
-              value={pattern.steps}
-              onChange={(e) => setSteps(Number(e.target.value))}
-              className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
-            >
-              {STEP_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <span className="text-zinc-500">Grid</span>
-            <select
-              value={pattern.stepsPerBeat}
-              onChange={(e) => setStepsPerBeat(Number(e.target.value))}
-              className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200 outline-none ring-1 ring-zinc-700 focus:ring-zinc-500 text-[10px]"
-            >
-              {SPB_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            onClick={clearAll}
-            className="rounded px-1.5 py-0.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors text-[10px]"
-          >
-            Clear
-          </button>
-          <div className="flex-1" />
-          <span className="text-[10px] text-zinc-600">{spbLabel} &middot; {pattern.steps} steps</span>
-        </div>
-
         {/* Grid area */}
         <div className="flex flex-1 overflow-auto">
           {/* Left: pad labels */}
@@ -239,7 +274,6 @@ export function StepSequencer({ clip, pattern }: StepSequencerProps) {
           </div>
         </div>
       </div>
-    </DraggablePanel>
   );
 }
 
