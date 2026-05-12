@@ -92,14 +92,18 @@ export function MidiClipView({ clip, pattern, color, zoom, scrollLeft, laneHeigh
     [clip.id, zoom, snap, updateClip, tracks, laneHeight],
   );
 
-  const onPointerUp = useCallback(() => {
-    dragRef.current = null;
-  }, []);
-
-  const onDoubleClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setEditingMidiClipId(clip.id);
+  const onPointerUp = useCallback(
+    (e: ReactPointerEvent) => {
+      const d = dragRef.current;
+      if (d && d.type === 'move') {
+        const dx = Math.abs(e.clientX - d.startX);
+        const dy = Math.abs(e.clientY - d.startY);
+        // If the pointer barely moved, treat as a click and open the editor
+        if (dx < 4 && dy < 4) {
+          setEditingMidiClipId(clip.id);
+        }
+      }
+      dragRef.current = null;
     },
     [clip.id, setEditingMidiClipId],
   );
@@ -137,7 +141,6 @@ export function MidiClipView({ clip, pattern, color, zoom, scrollLeft, laneHeigh
       onPointerDown={(e) => onPointerDown(e, 'move')}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onDoubleClick={onDoubleClick}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();

@@ -25,9 +25,9 @@ import { Timeline } from '@/components/timeline/Timeline';
 import { MetronomeLane } from '@/components/timeline/MetronomeLane';
 import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
-import { StepSequencer } from '@/components/sequencer/StepSequencer';
-import { PianoRoll } from '@/components/pianoroll/PianoRoll';
-import { TrackDetailPanel } from '@/components/tracks/TrackDetailPanel';
+import { StepSequencer, StepSequencerSidebar } from '@/components/sequencer/StepSequencer';
+import { PianoRoll, PianoRollSidebar } from '@/components/pianoroll/PianoRoll';
+import { TrackDetailPanel, TrackDetailSidebar } from '@/components/tracks/TrackDetailPanel';
 import { ClipContextMenu } from '@/components/timeline/ClipContextMenu';
 import { rootRoute } from './__root';
 
@@ -718,6 +718,63 @@ function DawEditorPage() {
   );
   useKeyboardShortcuts(shortcutHandlers);
 
+  // Compute inline panel state — clip editor takes priority, then track detail
+  const inlinePanelInfo = useMemo(() => {
+    if (editingMidiClipId) {
+      const editClip = clips.find((c) => c.id === editingMidiClipId);
+      const editPattern = editClip?.midiPatternId
+        ? midiPatterns.find((p) => p.id === editClip.midiPatternId)
+        : undefined;
+      if (editClip && editPattern) {
+        return {
+          trackId: editClip.trackId,
+          height: 340,
+          panel: <PianoRoll clip={editClip} pattern={editPattern} />,
+          sidebar: <PianoRollSidebar clip={editClip} pattern={editPattern} />,
+        };
+      }
+    }
+    if (editingDrumClipId) {
+      const editClip = clips.find((c) => c.id === editingDrumClipId);
+      const editPattern = editClip?.drumPatternId
+        ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
+        : undefined;
+      if (editClip && editPattern) {
+        return {
+          trackId: editClip.trackId,
+          height: Math.min(32 + editPattern.pads.length * 28 + 40, 380),
+          panel: <StepSequencer clip={editClip} pattern={editPattern} />,
+          sidebar: <StepSequencerSidebar clip={editClip} pattern={editPattern} />,
+        };
+      }
+    }
+    if (selectedTrackId) {
+      const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
+      if (selectedTrack) {
+        const trackClips = clips.filter((c) => c.trackId === selectedTrackId);
+        return {
+          trackId: selectedTrackId,
+          height: 200,
+          panel: (
+            <TrackDetailPanel
+              track={selectedTrack}
+              trackClips={trackClips}
+              drumPatterns={drumPatterns}
+              midiPatterns={midiPatterns}
+            />
+          ),
+          sidebar: <TrackDetailSidebar track={selectedTrack} />,
+        };
+      }
+    }
+    return null;
+  }, [editingMidiClipId, editingDrumClipId, selectedTrackId, clips, tracks, midiPatterns, drumPatterns]);
+
+  const inlinePanelTrackId = inlinePanelInfo?.trackId ?? null;
+  const inlinePanelHeight = inlinePanelInfo?.height ?? 0;
+  const inlinePanelContent = inlinePanelInfo?.panel ?? null;
+  const inlinePanelSidebar = inlinePanelInfo?.sidebar ?? null;
+
   if (!project) {
     return (
       <div className="flex h-screen items-center justify-center bg-zinc-950">
@@ -740,61 +797,17 @@ function DawEditorPage() {
             onNavigateHome={() => navigate({ to: '/projects' })}
           />
         }
-        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} onAddMidiTrack={handleAddMidiTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} />}
+        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} onAddMidiTrack={handleAddMidiTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} inlinePanelTrackId={inlinePanelTrackId} inlinePanelHeight={inlinePanelHeight} inlinePanelSidebar={inlinePanelSidebar} />}
         metronomeTrack={<MetronomeTrack />}
         metronomeLane={<MetronomeLane />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         masterLane={<MasterLane />}
-        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onCreateMidiClip={handleCreateMidiClip} onDropAudioFile={handleDropAudioFile} />}
-        bottomPanel={(() => {
-          // Track detail panel when a track is selected
-          if (selectedTrackId) {
-            const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
-            if (selectedTrack) {
-              const trackClips = clips.filter((c) => c.trackId === selectedTrackId);
-              return (
-                <TrackDetailPanel
-                  track={selectedTrack}
-                  trackClips={trackClips}
-                  drumPatterns={drumPatterns}
-                  midiPatterns={midiPatterns}
-                />
-              );
-            }
-          }
-          return undefined;
-        })()}
+        timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onCreateMidiClip={handleCreateMidiClip} onDropAudioFile={handleDropAudioFile} inlinePanelTrackId={inlinePanelTrackId} inlinePanelHeight={inlinePanelHeight} inlinePanelContent={inlinePanelContent} />}
         connectionStatus={connectionStatus}
         peerCount={peerCount}
         roomId={roomId}
         onShareRoom={handleShareRoom}
       />
-
-      {/* Floating editor modals */}
-      {(() => {
-        if (editingMidiClipId) {
-          const editClip = clips.find((c) => c.id === editingMidiClipId);
-          const editPattern = editClip?.midiPatternId
-            ? midiPatterns.find((p) => p.id === editClip.midiPatternId)
-            : undefined;
-          if (editClip && editPattern) {
-            return <PianoRoll clip={editClip} pattern={editPattern} />;
-          }
-        }
-        return null;
-      })()}
-      {(() => {
-        if (editingDrumClipId) {
-          const editClip = clips.find((c) => c.id === editingDrumClipId);
-          const editPattern = editClip?.drumPatternId
-            ? drumPatterns.find((p) => p.id === editClip.drumPatternId)
-            : undefined;
-          if (editClip && editPattern) {
-            return <StepSequencer clip={editClip} pattern={editPattern} />;
-          }
-        }
-        return null;
-      })()}
 
       <PreferencesWindow
         open={prefsOpen}

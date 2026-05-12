@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { TrackHeader } from './TrackHeader';
 import { DrumTrackHeader } from './DrumTrackHeader';
@@ -13,9 +13,12 @@ interface TrackListProps {
   recordingLevel: number;
   audioInputs: AudioDevice[];
   trackLevels: Map<string, StereoLevel>;
+  inlinePanelTrackId?: string | null;
+  inlinePanelHeight?: number;
+  inlinePanelSidebar?: ReactNode;
 }
 
-export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordingLevel, audioInputs, trackLevels }: TrackListProps) {
+export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordingLevel, audioInputs, trackLevels, inlinePanelTrackId, inlinePanelHeight, inlinePanelSidebar }: TrackListProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -38,34 +41,51 @@ export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordin
           ? [recordingLevel, recordingLevel]
           : playback;
 
+        const isEditorTrack = inlinePanelTrackId === track.id;
+
+        let header: ReactNode;
         if (track.type === 'drum') {
-          return (
+          header = (
             <DrumTrackHeader
               key={track.id}
               track={track}
               stereoLevel={stereo}
             />
           );
-        }
-
-        if (track.type === 'midi') {
-          return (
+        } else if (track.type === 'midi') {
+          header = (
             <MidiTrackHeader
               key={track.id}
               track={track}
               stereoLevel={stereo}
             />
           );
+        } else {
+          header = (
+            <TrackHeader
+              key={track.id}
+              track={track}
+              stereoLevel={stereo}
+              audioInputs={audioInputs}
+            />
+          );
         }
 
-        return (
-          <TrackHeader
-            key={track.id}
-            track={track}
-            stereoLevel={stereo}
-            audioInputs={audioInputs}
-          />
-        );
+        if (isEditorTrack && inlinePanelHeight) {
+          return (
+            <div key={track.id}>
+              {header}
+              <div
+                className="border-b border-zinc-800/40 bg-zinc-950"
+                style={{ height: inlinePanelHeight }}
+              >
+                {inlinePanelSidebar}
+              </div>
+            </div>
+          );
+        }
+
+        return header;
       })}
       <div className="relative mx-3 my-2" ref={menuRef}>
         <button
