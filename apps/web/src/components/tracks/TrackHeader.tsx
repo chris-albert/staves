@@ -2,11 +2,9 @@ import type { Track } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { LevelMeter } from './LevelMeter';
-import { InputSelect } from './InputSelect';
 import { Knob } from '@staves/ui';
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { AudioDevice } from '@/hooks/useAudioDevices';
 
 const TRACK_COLORS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -17,10 +15,9 @@ const TRACK_COLORS = [
 interface TrackHeaderProps {
   track: Track;
   stereoLevel: [number, number];
-  audioInputs: AudioDevice[];
 }
 
-export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProps) {
+export function TrackHeader({ track, stereoLevel }: TrackHeaderProps) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
   const tracks = useProjectStore((s) => s.tracks);
   const selectedTrackId = useUiStore((s) => s.selectedTrackId);
@@ -116,16 +113,11 @@ export function TrackHeader({ track, stereoLevel, audioInputs }: TrackHeaderProp
       )}
 
       <div className="flex flex-1 flex-col gap-1.5 px-3 py-2">
-        {/* Row 1: name + input select */}
+        {/* Row 1: name */}
         <div className="flex items-center gap-1.5">
           <span className="flex-1 truncate text-[13px] font-medium text-zinc-200">
             {track.name}
           </span>
-          <InputSelect
-            devices={audioInputs}
-            value={track.inputDeviceId}
-            onChange={(id) => updateTrack(track.id, { inputDeviceId: id })}
-          />
         </div>
 
         {/* Row 2: controls */}

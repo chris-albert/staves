@@ -152,11 +152,13 @@ export function useEngineSync() {
       originalStop();
     };
 
-    // On loop wrap, clear scheduled set so clips can be re-triggered
-    engine.transport.setOnLoopWrap(() => {
+    // On loop wrap, clear scheduled set so clips can be re-triggered.
+    // Use the boundary time to stop audio at the exact loop point
+    // instead of immediately, which would cut off notes still playing.
+    engine.transport.setOnLoopWrap((loopBoundaryTime: number) => {
       scheduledInSession.clear();
-      engine.clipPlayer.stopAll();
-      engine.synth.releaseAll();
+      engine.clipPlayer.stopAllAt(loopBoundaryTime);
+      engine.synth.releaseAllAt(loopBoundaryTime);
     });
 
     // --- Subscribe to store changes ---

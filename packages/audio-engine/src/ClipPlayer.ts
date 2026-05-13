@@ -87,6 +87,18 @@ export class ClipPlayer {
     }
   }
 
+  /** Stop all playing clips at a specific AudioContext time. */
+  stopAllAt(time: number): void {
+    for (const [id, node] of this.activeNodes) {
+      try {
+        node.stop(time);
+      } catch {
+        // Node may already be stopped
+      }
+      this.activeNodes.delete(id);
+    }
+  }
+
   /** Clear decoded buffer cache. */
   clearCache(): void {
     this.decodedBuffers.clear();
