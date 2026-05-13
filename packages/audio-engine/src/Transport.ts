@@ -226,10 +226,11 @@ export class Transport {
     }
   }
 
-  /** Callback invoked on each loop wrap so external code can clear per-session state. */
-  private onLoopWrap: (() => void) | null = null;
+  /** Callback invoked on each loop wrap so external code can clear per-session state.
+   *  Receives the AudioContext time at which the loop boundary occurs. */
+  private onLoopWrap: ((loopBoundaryTime: number) => void) | null = null;
 
-  setOnLoopWrap(cb: (() => void) | null): void {
+  setOnLoopWrap(cb: ((loopBoundaryTime: number) => void) | null): void {
     this.onLoopWrap = cb;
   }
 
@@ -249,7 +250,7 @@ export class Transport {
         this.startBeatOffset = this._loopStart;
         this.startContextTime = this.nextScheduleTime;
         this.lastScheduledMetronomeBeat = this._loopStart - 1;
-        if (this.onLoopWrap) this.onLoopWrap();
+        if (this.onLoopWrap) this.onLoopWrap(this.nextScheduleTime);
         continue;
       }
 
@@ -305,11 +306,13 @@ export class Transport {
       }
 
       if (needsLoopReset) {
-        // Reset origin to loopStart at the exact moment loopEnd was reached
+        // Reset origin to loopStart at the exact moment loopEnd was reached.
+        // nextScheduleTime is already set to the loopEnd context time.
+        const loopBoundaryTime = this.nextScheduleTime;
         this.startBeatOffset = this._loopStart;
-        this.startContextTime = this.nextScheduleTime;
+        this.startContextTime = loopBoundaryTime;
         this.lastScheduledMetronomeBeat = this._loopStart - 1;
-        if (this.onLoopWrap) this.onLoopWrap();
+        if (this.onLoopWrap) this.onLoopWrap(loopBoundaryTime);
         // Don't advance nextScheduleTime — it's already set to loopEnd context time.
         // The next while iteration will immediately schedule from loopStart.
       } else {

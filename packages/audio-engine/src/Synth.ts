@@ -175,12 +175,16 @@ export class Synth {
 
   /** Release all active voices immediately (e.g. on transport stop). */
   releaseAll(): void {
-    const now = this.context.currentTime;
+    this.releaseAllAt(this.context.currentTime);
+  }
+
+  /** Release all active voices at a specific AudioContext time. */
+  releaseAllAt(time: number): void {
     for (const voice of [...this.voices]) {
       try {
-        voice.gain.gain.cancelScheduledValues(now);
-        voice.gain.gain.setValueAtTime(0, now);
-        voice.osc.stop(now + 0.01);
+        voice.gain.gain.cancelScheduledValues(time);
+        voice.gain.gain.setValueAtTime(0, time);
+        voice.osc.stop(time + 0.01);
       } catch {
         // Voice may already be stopped
       }

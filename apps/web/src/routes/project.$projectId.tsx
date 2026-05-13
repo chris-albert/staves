@@ -20,9 +20,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Toolbar } from '@/components/layout/Toolbar';
 import { TrackList } from '@/components/tracks/TrackList';
 import { MasterTrack } from '@/components/tracks/MasterTrack';
-import { MetronomeTrack } from '@/components/tracks/MetronomeTrack';
 import { Timeline } from '@/components/timeline/Timeline';
-import { MetronomeLane } from '@/components/timeline/MetronomeLane';
 import { MasterLane } from '@/components/timeline/MasterLane';
 import { PreferencesWindow } from '@/components/layout/PreferencesWindow';
 import { StepSequencer, StepSequencerSidebar } from '@/components/sequencer/StepSequencer';
@@ -763,12 +761,12 @@ function DawEditorPage() {
               midiPatterns={midiPatterns}
             />
           ),
-          sidebar: <TrackDetailSidebar track={selectedTrack} />,
+          sidebar: <TrackDetailSidebar track={selectedTrack} audioInputs={inputs} />,
         };
       }
     }
     return null;
-  }, [editingMidiClipId, editingDrumClipId, selectedTrackId, clips, tracks, midiPatterns, drumPatterns]);
+  }, [editingMidiClipId, editingDrumClipId, selectedTrackId, clips, tracks, midiPatterns, drumPatterns, inputs]);
 
   const inlinePanelTrackId = inlinePanelInfo?.trackId ?? null;
   const inlinePanelHeight = inlinePanelInfo?.height ?? 0;
@@ -797,9 +795,7 @@ function DawEditorPage() {
             onNavigateHome={() => navigate({ to: '/projects' })}
           />
         }
-        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} onAddMidiTrack={handleAddMidiTrack} recordingLevel={recordingLevel} audioInputs={inputs} trackLevels={trackLevels} inlinePanelTrackId={inlinePanelTrackId} inlinePanelHeight={inlinePanelHeight} inlinePanelSidebar={inlinePanelSidebar} />}
-        metronomeTrack={<MetronomeTrack />}
-        metronomeLane={<MetronomeLane />}
+        trackList={<TrackList onAddTrack={handleAddTrack} onAddDrumTrack={handleAddDrumTrack} onAddMidiTrack={handleAddMidiTrack} recordingLevel={recordingLevel} trackLevels={trackLevels} inlinePanelTrackId={inlinePanelTrackId} inlinePanelHeight={inlinePanelHeight} inlinePanelSidebar={inlinePanelSidebar} />}
         masterTrack={<MasterTrack outputs={outputs} selectedOutputId={selectedOutputId} onSelectOutput={selectOutput} />}
         masterLane={<MasterLane />}
         timeline={<Timeline onCreateDrumClip={handleCreateDrumClip} onCreateMidiClip={handleCreateMidiClip} onDropAudioFile={handleDropAudioFile} inlinePanelTrackId={inlinePanelTrackId} inlinePanelHeight={inlinePanelHeight} inlinePanelContent={inlinePanelContent} />}

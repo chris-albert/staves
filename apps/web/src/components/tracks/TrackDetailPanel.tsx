@@ -4,6 +4,8 @@ import type { Track, DrumPattern, MidiPattern, Clip, SynthPatch, OscillatorWavef
 import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { Knob } from '@staves/ui';
+import { InputSelect } from './InputSelect';
+import type { AudioDevice } from '@/hooks/useAudioDevices';
 
 const PANEL_HEIGHT = 200;
 
@@ -34,7 +36,7 @@ export function TrackDetailPanel({ track, trackClips, drumPatterns, midiPatterns
 }
 
 /** Sidebar controls for the track detail panel, rendered in the track list sidebar */
-export function TrackDetailSidebar({ track }: { track: Track }) {
+export function TrackDetailSidebar({ track, audioInputs }: { track: Track; audioInputs?: AudioDevice[] }) {
   const setSelectedTrackId = useUiStore((s) => s.setSelectedTrackId);
   const updateTrack = useProjectStore((s) => s.updateTrack);
   const removeTrack = useProjectStore((s) => s.removeTrack);
@@ -99,7 +101,7 @@ export function TrackDetailSidebar({ track }: { track: Track }) {
           </svg>
         </button>
       </div>
-      <TrackControlsSummary track={track} />
+      <TrackControlsSummary track={track} audioInputs={audioInputs} />
       <div className="px-3 pb-3">
         <button
           onClick={() => removeTrack(track.id)}
@@ -118,15 +120,21 @@ export function TrackDetailSidebar({ track }: { track: Track }) {
 
 /* ---- Track controls summary ---- */
 
-function TrackControlsSummary({ track }: { track: Track }) {
+function TrackControlsSummary({ track, audioInputs }: { track: Track; audioInputs?: AudioDevice[] }) {
   const updateTrack = useProjectStore((s) => s.updateTrack);
 
   return (
     <div className="flex-1 flex flex-col gap-3 px-3 py-3">
-      <div className="flex items-center gap-3">
-        <Knob value={track.volume} min={0} max={1} onChange={(v) => updateTrack(track.id, { volume: v })} size={24} label="Vol" />
-        <Knob value={track.pan} min={-1} max={1} onChange={(v) => updateTrack(track.id, { pan: v })} size={24} label="Pan" />
-      </div>
+      {track.type === 'audio' && audioInputs && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-500">In</span>
+          <InputSelect
+            devices={audioInputs}
+            value={track.inputDeviceId}
+            onChange={(id) => updateTrack(track.id, { inputDeviceId: id })}
+          />
+        </div>
+      )}
       <div className="text-[10px] text-zinc-600 mt-auto">
         {track.type === 'drum' ? 'Drum Track' : track.type === 'midi' ? 'MIDI Synth Track' : 'Audio Track'}
       </div>
@@ -538,10 +546,7 @@ function AudioTrackDetail({ track }: { track: Track }) {
         <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Track Settings</span>
       </div>
       <div className="flex items-center justify-center flex-1 text-xs text-zinc-600">
-        <div className="text-center">
-          <div className="text-zinc-500 mb-1">{track.name}</div>
-          <div className="text-[10px]">Select a track to view its settings. Effects coming soon.</div>
-        </div>
+        <div className="text-[10px]">Effects coming soon.</div>
       </div>
     </div>
   );

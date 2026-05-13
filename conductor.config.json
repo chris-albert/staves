@@ -10,6 +10,11 @@
       ]
     },
     {
+      "name": "dev:desktop",
+      "description": "Dev Desktop",
+      "command": "pnpm dev:desktop"
+    },
+    {
       "name": "test",
       "command": "pnpm test --watch"
     }

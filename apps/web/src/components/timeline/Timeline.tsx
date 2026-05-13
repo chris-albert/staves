@@ -237,7 +237,7 @@ export function Timeline({ onScrollTop, scrollTopExternal, onCreateDrumClip, onC
         {/* Inline clip editor panel rendered between tracks */}
         {inlinePanelContent && editorTrackIndex >= 0 && inlinePanelHeight && (
           <div
-            className="absolute left-0 right-0 border-t border-b border-zinc-700 z-10"
+            className="absolute left-0 right-0 border-t border-b border-zinc-700 z-30"
             style={{ top: (editorTrackIndex + 1) * trackHeight, height: inlinePanelHeight }}
           >
             {inlinePanelContent}

@@ -5,8 +5,6 @@ import type { ConnectionStatus } from '@/hooks/useSync';
 interface AppShellProps {
   toolbar: ReactNode;
   trackList: ReactNode;
-  metronomeTrack: ReactNode;
-  metronomeLane: ReactNode;
   masterTrack: ReactNode;
   masterLane: ReactNode;
   timeline: ReactNode;
@@ -16,7 +14,7 @@ interface AppShellProps {
   onShareRoom: () => void;
 }
 
-export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, masterTrack, masterLane, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
+export function AppShell({ toolbar, trackList, masterTrack, masterLane, timeline, connectionStatus, peerCount, roomId, onShareRoom }: AppShellProps) {
   const trackListRef = useRef<HTMLDivElement>(null);
   const [, setScrollTop] = useState(0);
 
@@ -33,7 +31,7 @@ export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, ma
         {/* Scrollable tracks area */}
         <div className="flex flex-1 overflow-hidden">
           {/* Track list sidebar */}
-          <div className="w-60 flex-shrink-0 flex flex-col overflow-hidden border-r border-zinc-800/80 bg-zinc-950">
+          <div className="w-40 flex-shrink-0 flex flex-col overflow-hidden border-r border-zinc-800/80 bg-zinc-950">
             <div
               ref={trackListRef}
               className="flex-1 overflow-y-auto scrollbar-hidden"
@@ -49,21 +47,12 @@ export function AppShell({ toolbar, trackList, metronomeTrack, metronomeLane, ma
             {timeline}
           </div>
         </div>
-        {/* Metronome row pinned above master */}
-        <div className="flex flex-shrink-0">
-          <div className="w-60 flex-shrink-0 border-r border-zinc-800/80">
-            {metronomeTrack}
-          </div>
-          <div className="flex-1 overflow-hidden">
-            {metronomeLane}
-          </div>
-        </div>
         {/* Master row pinned at bottom: sidebar controls + tempo/time sig lane */}
         <div className="flex flex-shrink-0">
-          <div className="w-60 flex-shrink-0 border-r border-zinc-800/80">
+          <div className="w-40 flex-shrink-0 border-r border-zinc-800/80">
             {masterTrack}
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex flex-col justify-end">
             {masterLane}
           </div>
         </div>

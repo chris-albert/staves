@@ -3,7 +3,6 @@ import { useProjectStore } from '@/stores/projectStore';
 import { TrackHeader } from './TrackHeader';
 import { DrumTrackHeader } from './DrumTrackHeader';
 import { MidiTrackHeader } from './MidiTrackHeader';
-import type { AudioDevice } from '@/hooks/useAudioDevices';
 import type { StereoLevel } from '@/hooks/useTrackLevels';
 
 interface TrackListProps {
@@ -11,14 +10,13 @@ interface TrackListProps {
   onAddDrumTrack?: () => void;
   onAddMidiTrack?: () => void;
   recordingLevel: number;
-  audioInputs: AudioDevice[];
   trackLevels: Map<string, StereoLevel>;
   inlinePanelTrackId?: string | null;
   inlinePanelHeight?: number;
   inlinePanelSidebar?: ReactNode;
 }
 
-export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordingLevel, audioInputs, trackLevels, inlinePanelTrackId, inlinePanelHeight, inlinePanelSidebar }: TrackListProps) {
+export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordingLevel, trackLevels, inlinePanelTrackId, inlinePanelHeight, inlinePanelSidebar }: TrackListProps) {
   const tracks = useProjectStore((s) => s.tracks);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -66,7 +64,6 @@ export function TrackList({ onAddTrack, onAddDrumTrack, onAddMidiTrack, recordin
               key={track.id}
               track={track}
               stereoLevel={stereo}
-              audioInputs={audioInputs}
             />
           );
         }
