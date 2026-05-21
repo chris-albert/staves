@@ -96,6 +96,8 @@ export interface DrumPattern {
   activeSteps: DrumStep[];
   /** Pad configuration (12 pads). */
   pads: DrumPadConfig[];
+  /** Track module chain (MIDI generators, effects, etc.). */
+  modules?: TrackModule[];
 }
 
 export type OscillatorWaveform = 'sine' | 'sawtooth' | 'square' | 'triangle';
@@ -108,12 +110,31 @@ export interface ADSREnvelope {
   release: number;
 }
 
+export interface OscillatorConfig {
+  waveform: OscillatorWaveform;
+  detune: number;
+  octaveOffset: number;
+}
+
+export type NoiseType = 'white' | 'pink' | 'brown';
+
+export interface NoiseConfig {
+  type: NoiseType;
+}
+
+export interface SynthMixer {
+  osc1: number;
+  osc2: number;
+  osc3: number;
+  noise: number;
+}
+
 export interface SynthPatch {
-  oscillator: {
-    waveform: OscillatorWaveform;
-    detune: number;
-    octaveOffset: number;
-  };
+  oscillator: OscillatorConfig;
+  osc2?: OscillatorConfig;
+  osc3?: OscillatorConfig;
+  noise?: NoiseConfig;
+  mixer?: SynthMixer;
   filter: {
     type: FilterType;
     cutoff: number;
@@ -122,6 +143,158 @@ export interface SynthPatch {
   ampEnvelope: ADSREnvelope;
   filterEnvelope: ADSREnvelope & { amount: number };
 }
+
+/* ---- Track Module System ---- */
+
+export type ArpMode = 'up' | 'down' | 'up-down' | 'random';
+export type ArpRate = '1/4' | '1/8' | '1/8T' | '1/16' | '1/16T' | '1/32';
+
+export interface ArpeggiatorModule {
+  type: 'arpeggiator';
+  id: string;
+  enabled: boolean;
+  mode: ArpMode;
+  rate: ArpRate;
+  /** Number of octaves to span (1-4). */
+  octaves: number;
+  /** Note duration as fraction of step length (0.01-1.0). */
+  gateLength: number;
+  /** Swing amount (0 = none, 1 = full triplet swing). */
+  swing: number;
+  /** 0 = auto (use all input notes), 1-32 = fixed step count before repeating. */
+  patternLength: number;
+  velocityCurve: 'flat' | 'accent-first' | 'crescendo' | 'decrescendo';
+}
+
+export type ChordQuality = 'major' | 'minor' | 'dim' | 'aug' | 'sus2' | 'sus4' | 'maj7' | 'min7' | 'dom7' | 'custom';
+
+export interface ChordModule {
+  type: 'chord';
+  id: string;
+  enabled: boolean;
+  quality: ChordQuality;
+  /** Custom intervals in semitones from root (used when quality === 'custom'). */
+  customIntervals: number[];
+  /** Velocity scaling for added notes (0-1, 1 = same as root). */
+  velocityScale: number;
+}
+
+export interface HumanizeModule {
+  type: 'humanize';
+  id: string;
+  enabled: boolean;
+  /** Max random timing offset in beats (e.g. 0.02 = ~30ms at 120bpm). */
+  timingAmount: number;
+  /** Max random velocity offset (0-1 range, e.g. 0.1 = ±10%). */
+  velocityAmount: number;
+  /** Max random duration offset as fraction (e.g. 0.1 = ±10%). */
+  durationAmount: number;
+}
+
+export interface TransposeModule {
+  type: 'transpose';
+  id: string;
+  enabled: boolean;
+  /** Semitones to shift (-48 to 48). */
+  semitones: number;
+}
+
+export type ScaleName = 'major' | 'minor' | 'dorian' | 'mixolydian' | 'pentatonic-major' | 'pentatonic-minor' | 'blues' | 'harmonic-minor' | 'melodic-minor' | 'chromatic';
+export type NoteName = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
+
+export interface ScaleQuantizeModule {
+  type: 'scale-quantize';
+  id: string;
+  enabled: boolean;
+  root: NoteName;
+  scale: ScaleName;
+}
+
+export type StrumDirection = 'down' | 'up' | 'alternate';
+
+export interface StrumModule {
+  type: 'strum';
+  id: string;
+  enabled: boolean;
+  /** Delay between each note in beats. */
+  delayPerNote: number;
+  direction: StrumDirection;
+}
+
+export interface ProbabilityGateModule {
+  type: 'probability-gate';
+  id: string;
+  enabled: boolean;
+  /** Probability each note plays (0-1). */
+  probability: number;
+}
+
+export type VelocityCurveType = 'compress' | 'expand' | 'fixed' | 'random-range';
+
+export interface VelocityMapModule {
+  type: 'velocity-map';
+  id: string;
+  enabled: boolean;
+  curve: VelocityCurveType;
+  /** Fixed velocity value (used when curve === 'fixed', 0-1). */
+  fixedValue: number;
+  /** Min velocity for random-range (0-1). */
+  min: number;
+  /** Max velocity for random-range (0-1). */
+  max: number;
+}
+
+export interface NoteFilterModule {
+  type: 'note-filter';
+  id: string;
+  enabled: boolean;
+  /** Minimum MIDI pitch to pass (0-127). */
+  minPitch: number;
+  /** Maximum MIDI pitch to pass (0-127). */
+  maxPitch: number;
+  /** Minimum velocity to pass (0-1). */
+  minVelocity: number;
+  /** Maximum velocity to pass (0-1). */
+  maxVelocity: number;
+}
+
+export interface NoteRepeatModule {
+  type: 'note-repeat';
+  id: string;
+  enabled: boolean;
+  /** Number of repeats (1-8). */
+  repeats: number;
+  /** Interval between repeats in beats. */
+  interval: number;
+  /** Velocity decay per repeat (0-1, e.g. 0.8 = each repeat is 80% of previous). */
+  decay: number;
+}
+
+export interface EuclideanRhythmModule {
+  type: 'euclidean-rhythm';
+  id: string;
+  enabled: boolean;
+  /** Total number of steps in the pattern (2-32). */
+  steps: number;
+  /** Number of pulses/hits to distribute (1-steps). */
+  pulses: number;
+  /** Rotation offset (0 to steps-1). */
+  rotation: number;
+}
+
+/** Discriminated union — grows as new module types are added. */
+export type TrackModule =
+  | ArpeggiatorModule
+  | ChordModule
+  | HumanizeModule
+  | TransposeModule
+  | ScaleQuantizeModule
+  | StrumModule
+  | ProbabilityGateModule
+  | VelocityMapModule
+  | NoteFilterModule
+  | NoteRepeatModule
+  | EuclideanRhythmModule;
 
 export interface MidiNote {
   id: string;
@@ -137,6 +310,8 @@ export interface MidiPattern {
   durationBeats: number;
   notes: MidiNote[];
   synthPatch: SynthPatch;
+  /** Track module chain (MIDI generators, effects, etc.). */
+  modules?: TrackModule[];
 }
 
 export interface Marker {
@@ -307,6 +482,29 @@ db.version(9).stores({
   drumPatterns: 'id, projectId',
   midiPatterns: 'id, projectId',
   markers: 'id, projectId, beat',
+});
+
+// Add track module system (modules field on patterns)
+db.version(10).stores({
+  projects: 'id, updatedAt',
+  tracks: 'id, projectId, order',
+  clips: 'id, trackId, projectId, audioBlobId',
+  audioBlobs: 'id, projectId',
+  waveformCache: 'audioBlobId',
+  drumPatterns: 'id, projectId',
+  midiPatterns: 'id, projectId',
+  markers: 'id, projectId, beat',
+}).upgrade((tx) => {
+  // modules is stored inline in the pattern JSON, no index change needed.
+  // Just ensure existing records get the field defaulted.
+  return Promise.all([
+    tx.table('midiPatterns').toCollection().modify((p) => {
+      if (!p.modules) p.modules = [];
+    }),
+    tx.table('drumPatterns').toCollection().modify((p) => {
+      if (!p.modules) p.modules = [];
+    }),
+  ]);
 });
 
 export { db };

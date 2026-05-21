@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { AudioEngine, TrackNode, TempoMap } from '@staves/audio-engine';
+import {
+  AudioEngine, TrackNode, TempoMap, arpeggiate,
+  applyChord, applyHumanize, applyTranspose, applyScaleQuantize,
+  applyStrum, applyProbabilityGate, applyVelocityMap,
+  applyNoteFilter, applyNoteRepeat, applyEuclideanRhythm,
+} from '@staves/audio-engine';
 import type { ScheduledClip, ScheduledDrumClip, ScheduledDrumHit, ScheduledMidiClip, ScheduledMidiNote } from '@staves/audio-engine';
 import { audioBlobStore } from '@staves/storage';
 import { useProjectStore } from '@/stores/projectStore';
@@ -303,7 +308,7 @@ export function useEngineSync() {
         const pattern = midiPatternMap.get(clip.midiPatternId);
         if (!pattern) continue;
 
-        const notes: ScheduledMidiNote[] = [];
+        let notes: ScheduledMidiNote[] = [];
         for (const note of pattern.notes) {
           notes.push({
             beat: clip.startBeat + note.startBeat,
@@ -311,6 +316,48 @@ export function useEngineSync() {
             pitch: note.pitch,
             velocity: note.velocity,
           });
+        }
+
+        // Run notes through the MIDI module chain (left to right)
+        if (pattern.modules) {
+          for (const mod of pattern.modules) {
+            if (!mod.enabled) continue;
+            switch (mod.type) {
+              case 'arpeggiator':
+                notes = arpeggiate(notes, mod, clip.startBeat, clip.durationBeats);
+                break;
+              case 'chord':
+                notes = applyChord(notes, mod);
+                break;
+              case 'humanize':
+                notes = applyHumanize(notes, mod);
+                break;
+              case 'transpose':
+                notes = applyTranspose(notes, mod);
+                break;
+              case 'scale-quantize':
+                notes = applyScaleQuantize(notes, mod);
+                break;
+              case 'strum':
+                notes = applyStrum(notes, mod);
+                break;
+              case 'probability-gate':
+                notes = applyProbabilityGate(notes, mod);
+                break;
+              case 'velocity-map':
+                notes = applyVelocityMap(notes, mod);
+                break;
+              case 'note-filter':
+                notes = applyNoteFilter(notes, mod);
+                break;
+              case 'note-repeat':
+                notes = applyNoteRepeat(notes, mod);
+                break;
+              case 'euclidean-rhythm':
+                notes = applyEuclideanRhythm(notes, mod, clip.startBeat, clip.durationBeats);
+                break;
+            }
+          }
         }
 
         scheduledMidi.push({

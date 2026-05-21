@@ -15,3 +15,12 @@ export { AudioClock } from './AudioClock';
 export { Recorder } from './Recorder';
 export { exportToWav } from './exportWav';
 export { MidiInput } from './MidiInput';
+export { arpeggiate, DEFAULT_ARPEGGIATOR } from './Arpeggiator';
+export {
+  applyChord, applyHumanize, applyTranspose, applyScaleQuantize,
+  applyStrum, applyProbabilityGate, applyVelocityMap,
+  applyNoteFilter, applyNoteRepeat, applyEuclideanRhythm,
+  DEFAULT_CHORD, DEFAULT_HUMANIZE, DEFAULT_TRANSPOSE, DEFAULT_SCALE_QUANTIZE,
+  DEFAULT_STRUM, DEFAULT_PROBABILITY_GATE, DEFAULT_VELOCITY_MAP,
+  DEFAULT_NOTE_FILTER, DEFAULT_NOTE_REPEAT, DEFAULT_EUCLIDEAN_RHYTHM,
+} from './MidiModules';
